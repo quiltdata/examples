@@ -1,0 +1,27 @@
+contents:
+  README:
+    file: README.md
+  ADAM21P1:
+    file: ADAM21P1.mageck.gene_summary.txt
+    transform: tsv
+  C17orf75:
+    file: C17orf75.mageck.gene_summary.txt
+    transform: tsv
+  CCDC182:
+    file: CCDC182.mageck.gene_summary.txt
+    transform: tsv
+  IER2:
+    file: IER2.mageck.gene_summary.txt
+    transform: tsv
+  MIR1226:
+    file: MIR1226.mageck.gene_summary.xlsx
+  MIR651:
+    file: MIR651.mageck.gene_summary.xlsx
+  MITD1:
+    file: MITD1.mageck.gene_summary.xlsx
+  PRSS23:
+    file: PRSS23.mageck.gene_summary.txt
+    transform: tsv
+  USF3:
+    file: USF3.mageck.gene_summary.txt
+    transform: tsv
