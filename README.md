@@ -1,3 +1,2 @@
-# Overview
-Illustrate the difference between working with files and working
-with [data packages](https://quiltdata.com).
+# Examples of working with Quilt data packages
+See also [docs.quiltdata.com](https://docs.quiltdata.com).
