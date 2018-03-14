@@ -1,5 +1,1 @@
-matplotlib
-numpy
-pandas
 quilt
-seaborn
