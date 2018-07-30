@@ -1,7 +1,7 @@
 # Examples of working with Quilt data packages
 See also [docs.quiltdata.com](https://docs.quiltdata.com).
 
-## Binder links (run notebooks in you browser)
+## Binder links (run notebooks in browser)
 
 ### [graphics/FiveThirtyEight.ipynb](./graphics/FiveThirtyEight.ipynb)
 
