@@ -1,0 +1,3 @@
+pandas==1.4.2
+quilt3==3.6.0
+perspective-python==1.0.0
