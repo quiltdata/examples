@@ -1,8 +1,8 @@
 import argparse
 import sys
+import time
 
 import boto3
-
 
 
 
@@ -25,18 +25,25 @@ def create_table_or_view(ddlfile, bucket, pfx, isview=False):
             QueryString=drop_ddl,
             ResultConfiguration={'OutputLocation': athena_output_path}
         )
-
+        time.sleep(1)
+    
         # Create an external table in Athena
         create_ddl = ddl.read().format(
             prefix=pfx,
             bucket=bucket
         )
         print(create_ddl)
-        ath.start_query_execution(
+
+        response = ath.start_query_execution(
             QueryString=create_ddl,
             ResultConfiguration={'OutputLocation': athena_output_path}
         )
-
+        time.sleep(2)
+        results = ath.get_query_results(
+            QueryExecutionId=response['QueryExecutionId']
+        )
+        print(results)
+        
 
 def main(argv):
     parser = argparse.ArgumentParser(description='Create Package Tables and Views in AWS Athena.')
