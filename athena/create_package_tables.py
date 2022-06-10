@@ -4,10 +4,11 @@ import sys
 import boto3
 
 
+
+
 def create_table_or_view(ddlfile, bucket, pfx, isview=False):
     ath = boto3.client('athena')
-    #athena_output_path = 's3://{bucket}/.quilt/athena'
-    athena_output_path = 's3://quilt-kevin-staging/athena/ddl'
+    athena_output_path = 's3://{bucket}/.athena/quilt'
 
     with open(ddlfile) as ddl:
         # Drop the Table if it exists
