@@ -7,7 +7,7 @@ The code in this example
 The first step is to create tables and views in Athena that point to the package metadata in your bucket. This example includes a script that creates two views that expose the package metadata to AWS Athena.
 
 To run the example on your bucket, run:
-`AWS_PROFILE=default python create_package_tables.py <BUCKET>`
+`AWS_PROFILE=YOUR_PROFILE python create_package_tables.py <BUCKET>`
 
 The `create_package_tables` script uses boto3 to create two base tables then two views that query those tables and extract additional information into separate columns.
 
