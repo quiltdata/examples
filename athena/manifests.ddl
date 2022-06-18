@@ -1,4 +1,4 @@
-CREATE EXTERNAL TABLE `{prefix}_{bucket}`(
+CREATE EXTERNAL TABLE `quilt_manifests_{bucket}`(
   `logical_key` string COMMENT 'from deserializer', 
   `physical_keys` array<string> COMMENT 'from deserializer', 
   `size` string COMMENT 'from deserializer', 
