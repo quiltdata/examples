@@ -1,8 +1,8 @@
-# Purpose:  Enable Athena functionality from Quilt web catalog
+# Purpose:  Expose Metadata from a single Quilt bucket in Athena
 #===============================================================================
 AWSTemplateFormatVersion: "2010-09-09"
 Description: |
-  Enable Athena from Quilt - Creates Athena Workgroup, Bucket, Policy
+  Configure Athena tables for a Quilt Bucket
 
 Resources:
   AthenaWorkShopBucket:
