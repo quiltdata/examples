@@ -52,18 +52,10 @@ Parameters:
     MinLength: 1
     MaxLength: 16
     AllowedPattern: '[a-z][_a-z]*'
-  ARNDatacatalog:
-    Default: !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:datacatalog/*'
-    NoEcho: false
-    Description: Datacatalog(s) Quilt can access
-    Type: String
-    AllowedPattern: 'arn:aws:[a-zA-Z0-9-:]+'
-  ARNCatalog:
-    Default: !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
-    NoEcho: false
-    Description: Catalog Quilt can access
-    Type: String
-    AllowedPattern: 'arn:aws:[a-zA-Z0-9-:]+'
+
+# Non-parameters (no intrinsics allowed)
+# ARNDatacatalog: !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:datacatalog/*'
+# ARNCatalog:!Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
 
 Resources:
   AthenaQuiltOutput:
@@ -114,8 +106,8 @@ Resources:
           - athena:StartQueryExecution
           Resource:
           - !Ref AthenaQuiltWorkgroup
-          - !Ref ARNCatalog
-          - !Ref ARNDatacatalog
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:datacatalog/*'
         - Sid: AccessGlueDatabases
           Effect: Allow
           Action:
@@ -131,8 +123,8 @@ Resources:
           - glue:DeleteTable
           - glue:UpdateTable
           Resource:
-          - !Ref ARNCatalog
           - !Ref AthenaQuiltDatabase
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
           - !Sub
             - 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${Database}/{Tables}'
             - !Database Ref DatabaseName
@@ -156,10 +148,26 @@ Outputs:
   AthenaQuiltWorkgroup:
     Description: Athena Workgroup used by Quilt
     Value: !Ref AthenaQuiltWorkgroup
+    Export:
+      Name: !Sub "${AWS::StackName}-workgroup"
   AthenaQuiltPolicy:
     Description: IAM Policy used by Quilt to access Athena resource
     Value: !Ref AthenaQuiltAccess
+    Export:
+      Name: !Sub "${AWS::StackName}-policy"
   AthenaQuiltOutputBucket:
     Description: S3 bucket used by Quilt Workgroup
     Value: !Ref AthenaQuiltOutput
+    Export:
+      Name: !Sub "${AWS::StackName}-bucket"
+  AthenaQuiltDatabase:
+    Description: S3 bucket used by Quilt Workgroup
+    Value: !Ref DatabaseName
+    Export:
+      Name: !Sub "${AWS::StackName}-database"
+  AthenaQuiltDatabaseARN:
+    Description: S3 bucket used by Quilt Workgroup
+    Value: !Ref AthenaQuiltDatabase
+    Export:
+      Name: !Sub "${AWS::StackName}-database"
 
