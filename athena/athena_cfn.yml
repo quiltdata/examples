@@ -1,5 +1,6 @@
 # Purpose:  Enable Athena functionality from Quilt web catalog
 #===============================================================================
+# aws cloudformation validate-template --template-body file://athena/athena_cfn.yml
 AWSTemplateFormatVersion: "2010-09-09"
 Description: |
   Enable Athena from Quilt - Creates Athena Workgroup, Bucket, Policy
@@ -26,15 +27,13 @@ Parameters:
     Description: Granting Quilt access to these Athena resources
     Type: String
     MinLength: 1
-    MaxLength: 16
     AllowedPattern: '[A-Z][a-zA-Z0-9]*'
-  OutputBucket:
+  BucketSuffix:
     Default: athena-quilt-output
     NoEcho: false
     Description: Suffix used for per-account Athena output bucket
     Type: String
     MinLength: 1
-    MaxLength: 16
     AllowedPattern: '[a-z][-a-z0-9]*'
   DatabaseName:
     Default: quilt_metadata
@@ -45,13 +44,10 @@ Parameters:
     MaxLength: 16
     AllowedPattern: '[a-z][_a-z]*'
   DatabaseTableRegex:
-    Default: *_quilt_*
+    Default: '*_quilt_*'
     NoEcho: false
     Description: Regexp for Quilt-created Tables
     Type: String
-    MinLength: 1
-    MaxLength: 16
-    AllowedPattern: '[a-z][_a-z]*'
 
 # Non-parameters (no intrinsics allowed)
 # ARNDatacatalog: !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:datacatalog/*'
@@ -61,7 +57,7 @@ Resources:
   AthenaQuiltOutput:
     Type: "AWS::S3::Bucket"
     Properties:
-      BucketName: !Join ["-", !Ref YourCompany, !Ref BucketSuffix]
+      BucketName: !Join ["-", [!Ref YourCompany, !Ref BucketSuffix]]
 
   AthenaQuiltWorkgroup:
     Type: AWS::Athena::WorkGroup
@@ -71,7 +67,7 @@ Resources:
       WorkGroupConfiguration:
         PublishCloudWatchMetricsEnabled: true
         ResultConfiguration:
-          OutputLocation: !Join [ "", ["s3://" , Ref: AthenaQuiltOutput, "/"]]
+          OutputLocation: !Join ["", ["s3://" , Ref: AthenaQuiltOutput, "/"]]
 
   # https://docs.aws.amazon.com/glue/latest/dg/populate-with-cloudformation-templates.html
   AthenaQuiltDatabase:
@@ -93,7 +89,7 @@ Resources:
         - Sid: AccessAllAthenaWorkgroups
           Effect: Allow
           Action: athena:ListWorkGroups
-          Resource: *
+          Resource: '*'
         - Sid: AccessAthenaQuiltWorkgroup
           Effect: Allow
           Action:
@@ -115,7 +111,7 @@ Resources:
           - glue:GetDatabases
           - glue:GetTable
           - glue:GetTables
-          Resource: *
+          Resource: '*'
         - Sid: ModifyGlueDatabases
           Effect: Allow
           Action:
@@ -125,7 +121,7 @@ Resources:
           Resource:
           - !Ref AthenaQuiltDatabase
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
-          - !Sub
+          - Fn::Sub
             - 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${Database}/{Tables}'
             - !Database Ref DatabaseName
             - !Tables Ref DatabaseTableRegex
