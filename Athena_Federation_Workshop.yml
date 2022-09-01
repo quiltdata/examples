@@ -1,0 +1,628 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: 'AWS::Serverless-2016-10-31'
+Description: Athena Federation Workshop - Deploy EMR Cluster with Hbase, Elasticache RedisDB, Aurora Mysql, DynamoDB, Cloud9 IDE, Sagemaker Notebook instance, Glue Database, Athena Named Queries
+
+Mappings:
+  Map:
+    DatabaseMap:
+      DatabaseName: 'sales'
+      DatabaseInstanceType: 'db.r5.large'
+      DatabaseUsername: 'master'
+    Cloud9Map:
+      EC2InstanceType: 't2.micro'
+      AutoHibernateTimeout: '30'
+
+Resources:
+
+  AuroraUserPassword:
+    Type: "AWS::SecretsManager::Secret"
+    Properties:
+      Description: Athena Workshop User Password
+      Name: "AthenaJdbcFederation"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "master"}'
+        GenerateStringKey: "password"
+        PasswordLength: 32
+        ExcludeCharacters: '"@/\'
+
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      AccessControl: BucketOwnerFullControl
+      BucketName: !Join [ '-', [athena-federation-workshop, !Ref 'AWS::AccountId'] ]
+
+  V2EngineWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: V2EngineWorkGroup
+      RecursiveDeleteOption: true
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
+        EngineVersion:
+         SelectedEngineVersion: Athena engine version 2
+        PublishCloudWatchMetricsEnabled: true
+        ResultConfiguration:
+          OutputLocation: !Join [ "", ["s3://" , Ref: S3Bucket, "/"]]
+
+
+  UDFQRYCreateAmazonReviewsParquet:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: "Step 1 - create amazon reviews table"
+      Name: "Create Amazon Reviews Table"
+      QueryString: |
+                    CREATE EXTERNAL TABLE if not exists default.amazon_reviews_parquet(
+                      `marketplace` string,
+                      `customer_id` string,
+                      `review_id` string,
+                      `product_id` string,
+                      `product_parent` string,
+                      `product_title` string,
+                      `star_rating` int,
+                      `helpful_votes` int,
+                      `total_votes` int,
+                      `vine` string,
+                      `verified_purchase` string,
+                      `review_headline` string,
+                      `review_body` string,
+                      `review_date` bigint,
+                      `year` int)
+                    PARTITIONED BY (
+                      `product_category` string)
+                    ROW FORMAT SERDE
+                      'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe'
+                    STORED AS INPUTFORMAT
+                      'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat'
+                    OUTPUTFORMAT
+                      'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat'
+                    LOCATION
+                      's3://amazon-reviews-pds/parquet';
+
+                    msck repair table default.amazon_reviews_parquet;
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  UDFQRYCreateAmazonReviewsWithLanguage:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: "Step 2 - create table to Detect Language"
+      Name: "Create TBL for Language Detection"
+      QueryString: |
+                    CREATE TABLE default.amazon_reviews_with_language
+                    WITH (format='parquet') AS
+                    USING EXTERNAL FUNCTION detect_dominant_language(col1 VARCHAR) RETURNS VARCHAR LAMBDA 'textanalytics-udf'
+                    SELECT *, detect_dominant_language(review_body) AS language
+                    FROM default.amazon_reviews_parquet
+                    LIMIT 2000
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+
+  UDFQRYCreateAmazonReviewsWithTextAnalysis:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: "Step 3 - create table to Detect Sentiments"
+      Name: "Create TBL for Sentiment Detection"
+      QueryString: |
+                    CREATE TABLE default.amazon_reviews_with_text_analysis
+                    WITH (format='parquet') AS
+                    USING
+                    	EXTERNAL FUNCTION detect_sentiment_all(col1 VARCHAR, lang VARCHAR) RETURNS VARCHAR LAMBDA 'textanalytics-udf',
+                    	EXTERNAL FUNCTION detect_entities_all(col1 VARCHAR, lang VARCHAR) RETURNS VARCHAR LAMBDA 'textanalytics-udf'
+                    SELECT *,
+                    	detect_sentiment_all(review_body, language) AS sentiment,
+                    	detect_entities_all(review_body, language) AS entities
+                    FROM default.amazon_reviews_with_language
+                    WHERE language IN ('ar', 'hi', 'ko', 'zh-TW', 'ja', 'zh', 'de', 'pt', 'en', 'it', 'fr', 'es')
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  UDFQRYCreateSentimentResultsFinal:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: "Step 4 - Prepare Sentiments for analysis"
+      Name: "Create TBL for Sentiment Preparation"
+      QueryString: |
+                    CREATE TABLE default.sentiment_results_final WITH (format='parquet') AS
+                    SELECT
+                    	review_date, year, product_title, star_rating, language,
+                    	CAST(JSON_EXTRACT(sentiment,'$.sentiment') AS VARCHAR) AS sentiment,
+                    	CAST(JSON_EXTRACT(sentiment,'$.sentimentScore.positive') AS DOUBLE ) AS positive_score,
+                    	CAST(JSON_EXTRACT(sentiment,'$.sentimentScore.negative') AS DOUBLE ) AS negative_score,
+                    	CAST(JSON_EXTRACT(sentiment,'$.sentimentScore.neutral') AS DOUBLE ) AS neutral_score,
+                    	CAST(JSON_EXTRACT(sentiment,'$.sentimentScore.mixed') AS DOUBLE ) AS mixed_score,
+                    	review_headline, review_body
+                    FROM default.amazon_reviews_with_text_analysis
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  UDFQRYCreateEntitiesResultsFinal:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: "Step 5 - Prepare Entity for analysis"
+      Name: "Create TBL for Entity Preparation"
+      QueryString: |
+                    CREATE TABLE default.entities_results_final WITH (format='parquet') AS
+                    SELECT
+                    	review_date, year, product_title, star_rating, language,
+                    	CAST(JSON_EXTRACT(entity_element, '$.text') AS VARCHAR ) AS entity,
+                    	CAST(JSON_EXTRACT(entity_element, '$.type') AS VARCHAR ) AS category,
+                    	CAST(JSON_EXTRACT(entity_element, '$.score') AS DOUBLE ) AS score,
+                    	CAST(JSON_EXTRACT(entity_element, '$.beginOffset') AS INTEGER ) AS beginoffset,
+                    	CAST(JSON_EXTRACT(entity_element, '$.endOffset') AS INTEGER ) AS endoffset,
+                    	review_headline, review_body
+                    FROM
+                    (
+                    	SELECT *
+                    	FROM
+                    		(
+                    		SELECT *,
+                    		CAST(JSON_PARSE(entities) AS ARRAY(json)) AS entities_array
+                    		FROM default.amazon_reviews_with_text_analysis
+                    		)
+                    	CROSS JOIN UNNEST(entities_array) AS t(entity_element)
+                    )
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  Sources:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: " "
+      Name: "Sources"
+      QueryString: |
+                    select * from "lambda:hbase".default.lineitem limit 10;
+
+                    select * from "lambda:mysql".sales.supplier limit 10;
+
+                    select * from "lambda:dynamo".default.part limit 10;
+
+                    select * from "lambda:redis".redis.active_orders limit 5;
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  SuppliersWhoKeptOrdersWaiting:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: " "
+      Name: "SuppliersWhoKeptOrdersWaiting"
+      QueryString: |
+                    select
+                                                s_name, count(*) as numwait
+                                                from
+                                                    "lambda:mysql".sales.supplier,
+                                                    "lambda:hbase".default.lineitem l1,
+                                                    "lambda:mysql".sales.orders
+                                                where
+                                                    s_suppkey = "line:l_suppkey"
+                                                    and o_orderkey = "line:l_orderkey"
+                                                    and o_orderstatus = 'F'
+                                                    and "line:l_receiptdate" > "line:l_commitdate"
+                                                    and exists (
+                                                        select * from
+                                                            "lambda:hbase".default.lineitem
+                                                        where
+                                                            "line:l_orderkey" = "line:l_orderkey"
+                                                        )
+                                                group by s_name
+                                                order by numwait desc,
+                                                s_name;
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  ConnectorExample:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: " "
+      Name: "ConnectorExample"
+      QueryString: |
+                    SELECT   year,
+                             month,
+                             day,
+                             account_id,
+                             transaction.id
+                             FROM "lambda:example".schema1.table1
+                    WHERE year=2017 AND month=11;
+
+                    show tables in `lambda:example`.schema1;
+
+                    describe `lambda:example`.schema1.table1;
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  OrdersRevenueDateAndShipPrio:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: " "
+      Name: "OrdersRevenueDateAndShipPrio"
+      QueryString: |
+                    SELECT "line:l_orderkey",
+                                        sum("line:l_extendedprice"*(1-"line:l_discount")) AS revenue,
+                                        o_orderdate,
+                                        o_shippriority
+                                        FROM "lambda:mysql".sales.customer c, "lambda:mysql".sales.orders o, "lambda:hbase".default.lineitem l
+                                        WHERE c_mktsegment = 'AUTOMOBILE'
+                                        AND c_custkey = o_custkey
+                                        AND "line:l_orderkey" = o_orderkey
+                                        GROUP BY  "line:l_orderkey", o_orderdate, o_shippriority
+                                        ORDER BY  revenue desc, o_orderdate
+                                        limit 10;
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  ShippedLineitemsPricingReport:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: " "
+      Name: "ShippedLineitemsPricingReport"
+      QueryString: |
+                    SELECT "line:l_returnflag","line:l_linestats",
+                                                sum(cast("line:l_quantity" AS double)) AS sum_qty,
+                                                sum(cast("line:l_extendedprice" AS double)) AS sum_base_price,
+                                                sum(cast("line:l_extendedprice" AS double)*(1-cast("line:l_discount" AS double))) AS sum_disc_price,
+                                                sum(cast("line:l_extendedprice" AS double)*(1-cast("line:l_discount" AS double))*(1+cast("line:l_tax" AS double))) AS sum_charge,
+                                                avg(cast("line:l_quantity" AS double)) AS avg_qty,
+                                                avg(cast("line:l_extendedprice" AS double)) AS avg_price,
+                                                avg(cast("line:l_discount" AS double)) AS avg_disc,
+                                                count(*) AS count_order
+                                                FROM "lambda:hbase".default.lineitem
+                                                GROUP BY  "line:l_returnflag", "line:l_linestats"
+                                                ORDER BY  "line:l_returnflag", "line:l_linestats";
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  FetchActiveOrderInfo:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: " "
+      Name: "FetchActiveOrderInfo"
+      QueryString: |
+                    SELECT *
+                                        FROM "lambda:redis".redis.active_orders ao
+                                        LEFT JOIN "lambda:mysql".sales.orders o
+                                            ON ao.orderkey = o_orderkey
+                                        LEFT JOIN "lambda:mysql".sales.customer c
+                                            ON o_custkey = c_custkey
+                                        LEFT JOIN "lambda:hbase".default.lineitem l
+                                            ON "line:l_orderkey" = o_orderkey
+                                        LEFT JOIN "lambda:dynamo".default.part p
+                                            ON "line:l_partkey" = p.p_partkey
+                                        LEFT JOIN "lambda:dynamo".default.partsupp ps
+                                            ON p.p_partkey = ps.ps_partkey
+                                        LEFT JOIN "lambda:mysql".sales.supplier s
+                                            ON ps_suppkey = s_suppkey;
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  ProfitBySupplierNationByYr:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: " "
+      Name: "ProfitBySupplierNationByYr"
+      QueryString: |
+                    SELECT nation,
+                                                o_year,
+                                                sum(amount) AS sum_profit
+                         FROM
+                             (SELECT n_name AS nation,
+                                 year(cast(o_orderdate AS date)) AS o_year,
+                                 "line:l_extendedprice" * (1 - "line:l_discount") - cast(ps_supplycost AS double) * "line:l_quantity" AS amount
+                             FROM "lambda:dynamo".default.part, "lambda:mysql".sales.supplier, "lambda:hbase".default.lineitem, "lambda:dynamo".default.partsupp, "lambda:mysql".sales.orders, "lambda:redis".redis.nation
+                             WHERE s_suppkey = "line:l_suppkey"
+                                     AND ps_suppkey = "line:l_suppkey"
+                                     AND ps_partkey = "line:l_partkey"
+                                     AND p_partkey = "line:l_partkey"
+                                     AND o_orderkey = "line:l_orderkey"
+                                     AND s_nationkey = cast(Regexp_extract(_key_, '.*-(.*)', 1) AS int)
+                                     AND p_name LIKE '%green%' ) AS profit
+                         GROUP BY  nation, o_year
+                         ORDER BY  nation, o_year desc;
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  DetectAnamolyInOrdersData:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: " "
+      Name: "DetectAnamolyInOrdersData"
+      QueryString: |
+                    USING EXTERNAL FUNCTION detect_anomaly(b INT) RETURNS DOUBLE
+                                 SAGEMAKER
+                                 'PLEASE ENTER YOUR SAGEMAKER ENDPOINT NAME HERE'
+                                 SELECT o_orderdate,
+                                 count(*) as number,
+                                 detect_anomaly(cast(count(*) as int))
+                                 FROM "lambda:mysql".sales.orders
+                                 Group By o_orderdate
+                                 ORDER BY detect_anomaly(cast(count(*) as int)) DESC limit 10;
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+  RedactUdfCustomerAddress:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: "default"
+      Description: " "
+      Name: "RedactUdfCustomerAddress"
+      QueryString: |
+                    USING EXTERNAL FUNCTION redact(col1 VARCHAR) RETURNS VARCHAR LAMBDA
+                     'customudf'
+                     SELECT c_name,
+                             redact(c_name) AS redact_name ,
+                             c_phone,
+                             redact(c_phone) AS redact_phone ,
+                             c_address,
+                             redact(c_address) AS redact_address
+                     FROM "lambda:redis".redis.active_orders ao
+                     LEFT JOIN "lambda:mysql".sales.orders o
+                         ON ao.orderkey = o_orderkey
+                     LEFT JOIN "lambda:mysql".sales.customer c
+                         ON o_custkey = c_custkey
+                     WHERE c_address != '' ;
+      WorkGroup: !Join [ "", [Ref: V2EngineWorkGroup, ""]]
+
+
+  GlueDatabaseRedis:
+    Type: AWS::Glue::Database
+    Properties:
+      # The database is created in the Data Catalog for your account
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        # The name of the database is defined in the Parameters section above
+        Name: redis
+        Description: Database to hold tables for redis data
+        LocationUri: s3://fake-bucket?redis-db-flag=redis-db-flag
+        #Parameters: Leave AWS database parameters blank
+
+  GlueTableActiveOrders:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: redis
+      TableInput:
+        Name: active_orders
+        Description: Define the first few columns of the flights table
+        TableType: EXTERNAL_TABLE
+        Parameters: {
+          "redis-db-flag": "redis-db-flag",
+          "redis-endpoint": !Join [ '', [!GetAtt ElasticacheCluster.RedisEndpoint.Address, ':', !GetAtt ElasticacheCluster.RedisEndpoint.Port]] ,
+          "redis-key-prefix": "order-*",
+          "redis-value-type": "literal"
+        }
+        PartitionKeys:
+          - {Name: orderkey, Type: string}
+        StorageDescriptor:
+          Columns:
+            - Type: int
+              Name: orderkey
+          Location: s3://fake-bucket/
+
+  GlueTableNation:
+    Type: AWS::Glue::Table
+    DependsOn:
+      - ElasticacheCluster
+      - EMRClusterDataIngestion
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: redis
+      TableInput:
+        Name: nation
+        Description: Define the first few columns of the flights table
+        TableType: EXTERNAL_TABLE
+        Parameters: {
+          "redis-db-flag": "redis-db-flag",
+          "redis-endpoint": !Join [ '', [!GetAtt ElasticacheCluster.RedisEndpoint.Address, ':', !GetAtt ElasticacheCluster.RedisEndpoint.Port]] ,
+          "redis-key-prefix": "nation-*",
+          "redis-value-type": "literal"
+          }
+        PartitionKeys:
+          - {Name: n_name, Type: string}
+        StorageDescriptor:
+          Columns:
+            - Type: string
+              Name: n_name
+          Location: s3://fake-bucket/
+
+  EMRCluster:
+    DependsOn:
+      - EMRClusterServiceRole
+      - EMRClusterinstanceProfileRole
+      - EMRClusterinstanceProfile
+    Type: 'AWS::EMR::Cluster'
+    Properties:
+      Applications:
+        - Name: Hadoop
+        - Name: Hbase
+        - Name: Livy
+        - Name: Hive
+        - Name: Tez
+      Instances:
+        Ec2SubnetIds:
+          - !GetAtt VPCStack.Outputs.PublicSubnet1Id
+          - !GetAtt VPCStack.Outputs.PublicSubnet2Id
+          - !GetAtt VPCStack.Outputs.PublicSubnet3Id
+        AdditionalMasterSecurityGroups:
+          - !GetAtt VPCStack.Outputs.EMRSecurityGroup
+        AdditionalSlaveSecurityGroups:
+          - !GetAtt VPCStack.Outputs.EMRSecurityGroup
+        MasterInstanceFleet:
+          Name: master
+          InstanceTypeConfigs:
+            - InstanceType: m5.xlarge
+          TargetOnDemandCapacity: 1
+        CoreInstanceFleet:
+          Name: corefleet
+          InstanceTypeConfigs:
+            - BidPriceAsPercentageOfOnDemandPrice: 100
+              InstanceType: m4.xlarge
+              WeightedCapacity: 4
+            - BidPriceAsPercentageOfOnDemandPrice: 100
+              InstanceType: r4.xlarge
+              WeightedCapacity: 4
+            - BidPriceAsPercentageOfOnDemandPrice: 100
+              InstanceType: r5.xlarge
+              WeightedCapacity: 4
+          TargetOnDemandCapacity: 8
+          TargetSpotCapacity: 0
+        TerminationProtected: false
+      VisibleToAllUsers: true
+      JobFlowRole: !Ref EMRClusterinstanceProfile
+      LogUri: !Join [ "", ["s3://" , Ref: S3Bucket, "/elasticmapreduce/"]]
+      ReleaseLabel: emr-5.28.0
+      Name: EMR-Hbase-Cluster
+      ServiceRole: !Ref EMRClusterServiceRole
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 9fc6531a-444b-4ffd-80c9-a0b9918d3b5c
+  EMRClusterServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - elasticmapreduce.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceRole'
+        - 'arn:aws:iam::aws:policy/SecretsManagerReadWrite'
+      Path: /
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: f65fc89d-e8a4-4123-ab1f-2356afdbb78a
+  EMRClusterinstanceProfileRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceforEC2Role'
+        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonElastiCacheReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AWSLambda_FullAccess'
+        - 'arn:aws:iam::aws:policy/SecretsManagerReadWrite'
+      Path: /
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 8a829993-989c-4b6b-bf85-9075a75fa5d2
+  EMRClusterinstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EMRClusterinstanceProfileRole
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 6b57c761-da69-4eed-a697-1c8f86db53bd
+
+  EMRClusterDataIngestion:
+    Type: AWS::EMR::Step
+    DependsOn:
+      - EMRCluster
+      - AuroraDB
+      - DDBPartTable
+      - DDBPartSuppTable
+      - ElasticacheCluster
+    Properties:
+      ActionOnFailure: CONTINUE
+      HadoopJarStep:
+        Args:
+          - s3://aws-data-analytics-workshops/athena-workshop/scripts/bootstrap_new.sh
+        Jar: !Sub s3://${AWS::Region}.elasticmapreduce/libs/script-runner/script-runner.jar
+        MainClass: ''
+      JobFlowId: !Ref EMRCluster
+      Name: 'EMR Cluster Data Ingestion Step'
+
+  SagemakerNotebookInstance:
+    Type: 'AWS::SageMaker::NotebookInstance'
+    DependsOn:
+      - SagemakerRoleWS
+    Properties:
+      DirectInternetAccess: Enabled
+      SubnetId: !GetAtt VPCStack.Outputs.PublicSubnet1Id
+      NotebookInstanceName: workshop-notebook
+      InstanceType: ml.t2.medium
+      RoleArn: !GetAtt
+        - SagemakerRoleWS
+        - Arn
+      SecurityGroupIds:
+        - !GetAtt VPCStack.Outputs.WorkshopSecurityGroup
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: e21daf67-33db-4c6d-9319-1bc530456386
+  SagemakerRoleWS:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - sagemaker.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSageMakerFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonElasticMapReduceFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonRoute53ReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonAthenaFullAccess'
+        - 'arn:aws:iam::aws:policy/AWSLambda_FullAccess'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: f22a03d5-41e0-4d45-b2b9-bcc787179647
+
+Outputs:
+
+  EMRMasterAddress:
+    Description: EMR Cluster Master address
+    Value: !GetAtt EMRCluster.MasterPublicDNS
+
+  HbaseConnectionString:
+    Description: Hbase Instance address for Athena Connector
+    Value: !Join [ '', [!GetAtt EMRCluster.MasterPublicDNS , ':16010:2181']]
+
+  RDSInstanceAddress:
+    Description: RDS Instance endpoint
+    Value: !Join [ ':', [!GetAtt AuroraCluster.Endpoint.Address , !GetAtt AuroraCluster.Endpoint.Port]]
+
+  RDSConnectionString:
+    Description: RDS Instance endpoint
+    Value: !Join [ '', ['mysql://jdbc:mysql://',!GetAtt AuroraCluster.Endpoint.Address , ':', !GetAtt AuroraCluster.Endpoint.Port, '/', !FindInMap [Map, DatabaseMap, DatabaseName], '?${AthenaJdbcFederation}']]
+
+  ElastiCacheAddress:
+    Description: ElastiCache endpoint address
+    Value: !GetAtt ElasticacheCluster.RedisEndpoint.Address
+
+  ElastiCachePort:
+    Description: ElastiCache port
+    Value: 6379
+
+  S3Bucket:
+    Description: S3 bucket
+    Value: !Ref  S3Bucket
+
+  Subnets:
+    Description: Subnets for workshop
+    Value: !Join [',', [!GetAtt VPCStack.Outputs.PublicSubnet1Id,!GetAtt VPCStack.Outputs.PublicSubnet2Id,!GetAtt VPCStack.Outputs.PublicSubnet3Id]]
+
+  WorkshopSecurityGroup:
+    Description: 'Security Group'
+    Value: !GetAtt VPCStack.Outputs.WorkshopSecurityGroup
+
+  EMRSecurityGroup:
+    Description: 'Security Group'
+    Value: !GetAtt VPCStack.Outputs.EMRSecurityGroup

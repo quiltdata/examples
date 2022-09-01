@@ -79,9 +79,14 @@ Resources:
         Description: Database for all Quilt Metadata
         #LocationUri: ' '
 
+  AthenaQuiltGroup:
+    Type: AWS::IAM::Group
+
   AthenaQuiltAccess:
     Type: AWS::IAM::Policy
     Properties:
+      Groups:
+      - !Ref AthenaQuiltGroup
       PolicyName: !Ref PolicyName
       PolicyDocument:
         Version: '2012-10-17'
@@ -121,10 +126,9 @@ Resources:
           Resource:
           - !Ref AthenaQuiltDatabase
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
-          - Fn::Sub
-            - 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${Database}/{Tables}'
-            - !Database Ref DatabaseName
-            - !Tables Ref DatabaseTableRegex
+          - !Sub
+            - 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${Database}/${Tables}'
+            - {Database: !Ref DatabaseName, Tables: !Ref DatabaseTableRegex}
         - Sid: AccessQuiltAthenaOutputBucket
           Effect: Allow
           Action:
@@ -151,19 +155,24 @@ Outputs:
     Value: !Ref AthenaQuiltAccess
     Export:
       Name: !Sub "${AWS::StackName}-policy"
+  AthenaQuiltPolicyGroup:
+    Description: IAM Group associated with that Policy
+    Value: !Ref AthenaQuiltGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-group"
   AthenaQuiltOutputBucket:
     Description: S3 bucket used by Quilt Workgroup
     Value: !Ref AthenaQuiltOutput
     Export:
       Name: !Sub "${AWS::StackName}-bucket"
   AthenaQuiltDatabase:
-    Description: S3 bucket used by Quilt Workgroup
+    Description: Name for Database used for Quilt package tables
     Value: !Ref DatabaseName
     Export:
       Name: !Sub "${AWS::StackName}-database"
   AthenaQuiltDatabaseARN:
-    Description: S3 bucket used by Quilt Workgroup
+    Description: ARN for Database used for Quilt package tables
     Value: !Ref AthenaQuiltDatabase
     Export:
-      Name: !Sub "${AWS::StackName}-database"
+      Name: !Sub "${AWS::StackName}-database-arn"
 

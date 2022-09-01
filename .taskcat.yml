@@ -1,0 +1,13 @@
+# https://aws.amazon.com/blogs/infrastructure-and-automation/introducing-taskcat-v0-9/
+project:
+  name: athena-cfn
+  regions:
+  - us-east-1
+  parameters:
+    YourCompany: quilt-examples
+    AvailabilityZones: "$[taskcat_getaz_2]"
+    QSS3BucketName: "$[taskcat_autobucket]"
+    QSS3BucketRegion: "$[taskcat_current_region]"
+tests:
+  default:
+    template: ./athena/athena_cfn.yml
