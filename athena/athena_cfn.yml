@@ -6,28 +6,13 @@ Description: |
   Enable Athena from Quilt - Creates Athena Workgroup, Bucket, Policy
 
 Parameters:
-  YourCompany:
+  CompanyName:
     NoEcho: false
-    Description: Label representing your company, for use in naming buckets
+    Description: Lowercase label representing your company, for use in naming buckets
     Type: String
     MinLength: 1
     MaxLength: 16
-    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
-  WorkgroupName:
-    Default: quilt-workgroup
-    NoEcho: false
-    Description: Name for Quilt-specific Athena workgroup
-    Type: String
-    MinLength: 1
-    MaxLength: 16
-    AllowedPattern: '[a-z][-a-z0-9]*'
-  PolicyName:
-    Default: AthenaQuiltAccess
-    NoEcho: false
-    Description: Granting Quilt access to these Athena resources
-    Type: String
-    MinLength: 1
-    AllowedPattern: '[A-Z][a-zA-Z0-9]*'
+    AllowedPattern: '[a-z][a-z0-9]*'
   BucketSuffix:
     Default: athena-quilt-output
     NoEcho: false
@@ -48,6 +33,27 @@ Parameters:
     NoEcho: false
     Description: Regexp for Quilt-created Tables
     Type: String
+  PolicyName:
+    Default: AthenaQuiltAccess
+    NoEcho: false
+    Description: Granting Quilt access to these Athena resources
+    Type: String
+    MinLength: 1
+    AllowedPattern: '[A-Z][a-zA-Z0-9]*'
+  UniqueSeed:
+    Default: !Select [2, !Split ['/', !Ref AWS::StackId]]
+    NoEcho: false
+    Description: Unique string to use as a bucket suffix
+    Type: String
+    AllowedPattern: '[a-z][-a-z0-9]*'
+  WorkgroupName:
+    Default: quilt-workgroup
+    NoEcho: false
+    Description: Name for Quilt-specific Athena workgroup
+    Type: String
+    MinLength: 1
+    MaxLength: 16
+    AllowedPattern: '[a-z][-a-z0-9]*'
 
 # Non-parameters (no intrinsics allowed)
 # ARNDatacatalog: !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:datacatalog/*'
@@ -57,7 +63,7 @@ Resources:
   AthenaQuiltOutput:
     Type: "AWS::S3::Bucket"
     Properties:
-      BucketName: !Join ["-", [!Ref YourCompany, !Ref BucketSuffix]]
+      BucketName: !Join ["-", [!Ref CompanyName, !Ref BucketSuffix]]
 
   AthenaQuiltWorkgroup:
     Type: AWS::Athena::WorkGroup
