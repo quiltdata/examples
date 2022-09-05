@@ -49,8 +49,7 @@ Resources:
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseName:
-        - Fn::ImportValue:
-          !Sub "${QuiltAthenaStack}-database"
+        - Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
       TableInput:
         Name:
         - !Sub
@@ -83,8 +82,7 @@ Resources:
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseName:
-        - Fn::ImportValue:
-          !Sub "${QuiltAthenaStack}-database"
+        - Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
       TableInput:
         Name:
         - !Sub
@@ -131,10 +129,9 @@ Resources:
     Type: AWS::Athena::NamedQuery
     Properties:
       Database:
-      - Fn::ImportValue:
-        !Sub "${QuiltAthenaStack}-database"
+      - Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
       Name:
-      - !Sub
+        Fn::Sub:
         - "${Table} preview"
         - !Table Ref PackagesTable
       Description:
@@ -147,8 +144,7 @@ Resources:
         - "select * from ${Table} limit 10;"
         - !Table Ref PackagesTable
       WorkGroup:
-      - Fn::ImportValue:
-        !Sub "${QuiltAthenaStack}-workgroup"
+      - Fn::ImportValue: !Sub "${QuiltAthenaStack}-workgroup"
 
 Outputs:
   PackagesTableQuery:

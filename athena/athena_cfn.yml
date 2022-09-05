@@ -11,19 +11,19 @@ Parameters:
     Description: Lowercase label representing your company, for use in naming buckets
     Type: String
     MinLength: 1
-    MaxLength: 16
-    AllowedPattern: '[a-z][a-z0-9]*'
+    MaxLength: 32
+    AllowedPattern: '[a-z][-a-z0-9]*'
   BucketSuffix:
     Default: athena-quilt-output
     NoEcho: false
     Description: Suffix used for per-account Athena output bucket
     Type: String
-    MinLength: 1
+    MinLength: 3
     AllowedPattern: '[a-z][-a-z0-9]*'
   DatabaseName:
-    Default: quilt_metadata
+    Default: default
     NoEcho: false
-    Description: Name for Quilt-specific Athena database
+    Description: Name of an EXISTING Athena database to use for Quilt tables
     Type: String
     MinLength: 1
     MaxLength: 16
@@ -40,12 +40,6 @@ Parameters:
     Type: String
     MinLength: 1
     AllowedPattern: '[A-Z][a-zA-Z0-9]*'
-  UniqueSeed:
-    Default: !Select [2, !Split ['/', !Ref AWS::StackId]]
-    NoEcho: false
-    Description: Unique string to use as a bucket suffix
-    Type: String
-    AllowedPattern: '[a-z][-a-z0-9]*'
   WorkgroupName:
     Default: quilt-workgroup
     NoEcho: false
@@ -62,11 +56,13 @@ Parameters:
 Resources:
   AthenaQuiltOutput:
     Type: "AWS::S3::Bucket"
+    #DeletionPolicy: Retain
     Properties:
       BucketName: !Join ["-", [!Ref CompanyName, !Ref BucketSuffix]]
 
   AthenaQuiltWorkgroup:
     Type: AWS::Athena::WorkGroup
+    DeletionPolicy: Delete
     Properties:
       Name: !Ref WorkgroupName
       RecursiveDeleteOption: true
@@ -75,20 +71,12 @@ Resources:
         ResultConfiguration:
           OutputLocation: !Join ["", ["s3://" , Ref: AthenaQuiltOutput, "/"]]
 
-  # https://docs.aws.amazon.com/glue/latest/dg/populate-with-cloudformation-templates.html
-  AthenaQuiltDatabase:
-    Type: AWS::Glue::Database
-    Properties:
-      CatalogId: !Ref AWS::AccountId
-      DatabaseInput:
-        Name: !Ref DatabaseName
-        Description: Database for all Quilt Metadata
-        #LocationUri: ' '
-
   AthenaQuiltGroup:
+    DeletionPolicy: Delete
     Type: AWS::IAM::Group
 
   AthenaQuiltAccess:
+    DeletionPolicy: Delete
     Type: AWS::IAM::Policy
     Properties:
       Groups:
@@ -112,9 +100,12 @@ Resources:
           - athena:ListQueryExecutions
           - athena:StartQueryExecution
           Resource:
-          - !Ref AthenaQuiltWorkgroup
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:datacatalog/*'
+          - !Sub
+            - 'arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${Workgroup}'
+            - {Workgroup: !Ref AthenaQuiltWorkgroup}
+
         - Sid: AccessGlueDatabases
           Effect: Allow
           Action:
@@ -130,8 +121,10 @@ Resources:
           - glue:DeleteTable
           - glue:UpdateTable
           Resource:
-          - !Ref AthenaQuiltDatabase
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+          - !Sub
+            - 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${Database}'
+            - {Database: !Ref DatabaseName}
           - !Sub
             - 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${Database}/${Tables}'
             - {Database: !Ref DatabaseName, Tables: !Ref DatabaseTableRegex}
@@ -148,7 +141,7 @@ Resources:
           - s3:PutObject
           - s3:PutBucketPublicAccessBlock
           Resource:
-          - !Ref AthenaQuiltOutput
+          - !GetAtt AthenaQuiltOutput.Arn
 
 Outputs:
   AthenaQuiltWorkgroup:
@@ -172,13 +165,8 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-bucket"
   AthenaQuiltDatabase:
-    Description: Name for Database used for Quilt package tables
+    Description: Name of Database used for Quilt package tables
     Value: !Ref DatabaseName
     Export:
       Name: !Sub "${AWS::StackName}-database"
-  AthenaQuiltDatabaseARN:
-    Description: ARN for Database used for Quilt package tables
-    Value: !Ref AthenaQuiltDatabase
-    Export:
-      Name: !Sub "${AWS::StackName}-database-arn"
 
