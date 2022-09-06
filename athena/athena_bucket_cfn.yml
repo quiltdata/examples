@@ -44,56 +44,21 @@ Parameters:
 ## https://github.com/apache/hive/blob/master/serde/src/java/org/apache/hadoop/hive/serde2/lazy/LazySimpleSerDe.java
 
 Resources:
-  PackagesTable:
+
+  ManifestsTable:
     Type: AWS::Glue::Table
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseName:
-        - Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
+        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
       TableInput:
-        Name:
-        - !Sub
-          - "${BucketID}_quilt_packages"
-          - !BucketID Ref QuiltBucketID
+        Name: !Join ["_", [!Ref QuiltBucketID, "quilt_manifests"]]
         Description:
-        - !Sub
-          - "Make package top hashes from in s3://${Bucket} available in Athena"
-          - !Bucket Ref QuiltBucket
+          Fn::Sub:
+            - "Table of all the manifests in s3://${Bucket} (all package-level and object-level metadata)"
+            - {Bucket: !Ref QuiltBucket}
         TableType: EXTERNAL_TABLE
-        Properties:
-          has_encrypted_data: false
-          transient_lastDdlTime: 1557626200
-        StorageDescriptor:
-          Location:
-          - !Sub
-            - "s3://${Bucket}/.quilt/named_packages"
-            - !Bucket Ref QuiltBucket
-          InputFormat: org.apache.hadoop.mapred.TextInputFormat
-          OutputFormat: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
-          SerdeInfo:
-            Parameters:
-                 field.delim: ','
-            SerializationLibrary: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-          Columns:
-          - Name: hash
-            Type: string
-  ManifestTable:
-    Type: AWS::Glue::Table
-    Properties:
-      CatalogId: !Ref AWS::AccountId
-      DatabaseName:
-        - Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
-      TableInput:
-        Name:
-        - !Sub
-          - "${BucketID}_quilt_manifests"
-          - !BucketID Ref QuiltBucketID
-        Description:
-        - !Sub
-          - "Table of all the manifests in s3://${Bucket} (all package-level and object-level metadata)"
-          - !Bucket Ref QuiltBucket
-        TableType: EXTERNAL_TABLE
-        Properties:
+        Parameters:
           has_encrypted_data: false
         StorageDescriptor:
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
@@ -103,9 +68,9 @@ Resources:
               ignore.malformed.json: true
             SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
           Location:
-          - !Sub
-            - "s3://${Bucket}/.quilt/packages"
-            - !Bucket Ref QuiltBucket
+            Fn::Sub:
+              - "s3://${Bucket}/.quilt/packages"
+              - {Bucket: !Ref QuiltBucket}
           Columns:
           - Name: logical_key
             Type: string
@@ -124,32 +89,141 @@ Resources:
           - Name: version
             Type: string
 
+  PackagesTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName:
+        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
+      TableInput:
+        Name: !Join ["_", [!Ref QuiltBucketID, "quilt_packages"]]
+        Description:
+          Fn::Sub:
+            - "Make package of top hashes from s3://${Bucket} available in Athena"
+            - {Bucket: !Ref QuiltBucket}
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          has_encrypted_data: false
+          #transient_lastDdlTime: 1557626200
+        StorageDescriptor:
+          Location:
+            Fn::Sub:
+            - "s3://${Bucket}/.quilt/named_packages"
+            - {Bucket: !Ref QuiltBucket}
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
+          SerdeInfo:
+            Parameters:
+              field.delim: ','
+            SerializationLibrary: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+          Columns:
+          - Name: hash
+            Type: string
 
-  PackagesTableQuery:
+  PackagesViewCreator:
     Type: AWS::Athena::NamedQuery
     Properties:
-      Database:
-      - Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
-      Name:
-        Fn::Sub:
-        - "${Table} preview"
-        - !Table Ref PackagesTable
-      Description:
-      - !Sub
-        - "First few rows of ${Table} from s3://${Bucket}"
-        - !Table Ref PackagesTable
-        - !Bucket Ref QuiltBucket
-      QueryString:
-      - !Sub
-        - "select * from ${Table} limit 10;"
-        - !Table Ref PackagesTable
       WorkGroup:
-      - Fn::ImportValue: !Sub "${QuiltAthenaStack}-workgroup"
+        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "workgroup"]]
+      Database:
+        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
+      Name: !Join ["_", [create, !Ref PackagesTable, view]]
+      Description: !Join [" ", ["Quilt Query to create View from", !Ref PackagesTable]]
+      QueryString:
+        Fn::Sub:
+          - |
+            CREATE VIEW ${View} AS WITH
+            npv AS (
+              SELECT
+                regexp_extract("$path", '^s3:\/\/([^\/]+)\/([^\/]+)\/([^\/]+)\/([^\/]+)', 4) as user,
+                regexp_extract("$path", '^s3:\/\/([^\/]+)\/([^\/]+)\/([^\/]+)\/([^\/]+)\/([^\/]+)', 5) as name,
+                regexp_extract("$path", '[^/]+$') as timestamp,
+                ${Packages}."hash"
+                FROM ${Packages}
+            ),
+            mv AS (
+              SELECT
+                regexp_extract("$path", '[^/]+$') as tophash,
+                  manifest."meta",
+                  manifest."message"
+                FROM ${Manifests} as manifest
+                WHERE manifest."logical_key" IS NULL
+            )
+            SELECT
+              npv."user",
+              npv."name",
+              npv."hash",
+              npv."timestamp",
+              mv."message",
+              mv."meta"
+            FROM npv
+            JOIN mv
+            ON npv."hash" = mv."tophash";
+
+          - Manifests: !Ref ManifestsTable
+            Packages: !Ref PackagesTable
+            View: !Join ["_", [!Ref PackagesTable, view]]
+
+  ObjectsViewCreator:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      WorkGroup:
+        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "workgroup"]]
+      Database:
+        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
+      Name: !Join ["_", [create, !Ref QuiltBucketID, "quilt_objects_view"]]
+      Description: !Join [" ", ["Quilt Query to create View from", !Ref ManifestsTable]]
+      QueryString:
+        Fn::Sub:
+          - |
+            CREATE VIEW ${View} AS WITH
+              mv AS (
+                SELECT
+                  regexp_extract("$path", '[^/]+$') as tophash,
+                  manifest."logical_key",
+                  manifest."physical_keys",
+                  manifest."size",
+                  manifest."hash",
+                  manifest."meta",
+                  manifest."user_meta"
+                FROM
+                  ${Manifests} as manifest
+                WHERE manifest."logical_key" IS NOT NULL
+              )
+            SELECT
+              npv."user",
+              npv."name",
+              npv."timestamp",
+              mv."tophash",
+              mv."logical_key",
+              mv."physical_keys",
+              mv."size",
+              mv."hash",
+              mv."meta",
+              mv."user_meta"
+            FROM mv
+            JOIN ${PkgView} as npv
+            ON npv."hash" = mv."tophash";
+
+          - Manifests: !Ref ManifestsTable
+            PkgView: !Join ["_", [!Ref PackagesTable, view]]
+            View: !Join ["_", [!Ref QuiltBucketID, "quilt_objects_view"]]
 
 Outputs:
-  PackagesTableQuery:
-    Description: !Ref PackagesTableQuery.Description,
-    Value: !Ref PackagesTableQuery
+  ManifestsTable:
+    Value: !Ref ManifestsTable
     Export:
-      Name: !Sub "${AWS::StackName}-query-package-table"
+      Name: !Sub "${AWS::StackName}-manifests-table"
+  PackagesTable:
+    Value: !Ref PackagesTable
+    Export:
+      Name: !Sub "${AWS::StackName}-packages-table"
+  PackagesViewCreator:
+    Value: !Ref PackagesViewCreator
+    Export:
+      Name: !Sub "${AWS::StackName}-packages-view-creator"
+  ObjectsViewCreator:
+    Value: !Ref ObjectsViewCreator
+    Export:
+      Name: !Sub "${AWS::StackName}-objects-view-creator"
 

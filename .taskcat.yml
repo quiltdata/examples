@@ -11,3 +11,5 @@ project:
 tests:
   default:
     template: ./athena/athena_cfn.yml
+  bucket:
+    template: ./athena/athena_bucket_cfn.yml
