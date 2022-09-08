@@ -93,7 +93,7 @@ Resources:
           Effect: Allow
           Action:
           - athena:Create*
-          - athena:Get*
+          - athena:*Get*
           - athena:ListDatabases
           - athena:ListNamedQueries
           - athena:ListPreparedStatements
