@@ -67,8 +67,9 @@ Resources:
 
   QuiltAthenaAccess:
     DeletionPolicy: Delete
-    Type: AWS::IAM::Policy
+    Type: AWS::IAM::ManagedPolicy
     Properties:
+      Path: /
       PolicyName: !Ref PolicyName
       PolicyDocument:
         Version: '2012-10-17'
