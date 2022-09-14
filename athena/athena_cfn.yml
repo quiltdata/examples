@@ -29,20 +29,19 @@ Parameters:
     MinLength: 1
     AllowedPattern: '[A-Z][a-zA-Z0-9]*'
   SuffixBucket:
-    Default: query-output
+    Default: output
     NoEcho: false
-    Description: Suffix used for per-account Athena output bucket
+    Description: Suffix for per-workgroup Athena output bucket
     Type: String
     MinLength: 3
-    AllowedPattern: '[a-z][-a-z0-9]*'
+    AllowedPattern: '[a-z][a-z0-9]*'
   SuffixWorkGroup:
     Default: query
     NoEcho: false
     Description: Suffix for Quilt-specific Athena workgroup
     Type: String
-    MinLength: 1
-    MaxLength: 16
-    AllowedPattern: '[a-z][-a-z0-9]*'
+    MinLength: 3
+    AllowedPattern: '[a-z][a-z0-9]*'
 
 # Non-parameters (no intrinsics allowed)
 # ARNDatacatalog: !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:datacatalog/*'
@@ -53,7 +52,7 @@ Resources:
     Type: "AWS::S3::Bucket"
     #DeletionPolicy: Retain
     Properties:
-      BucketName: !Join ["-", [!Ref AWS::StackName, !Ref SuffixBucket]]
+      BucketName: !Join ["-", [!Ref AWS::StackName, !Ref SuffixWorkGroup, !Ref SuffixBucket]]
 
   AthenaQuiltWorkgroup:
     Type: AWS::Athena::WorkGroup
