@@ -1,18 +1,48 @@
 # Query Quilt Package Metadata in AWS Athena
 
-The code in this example shows you to create and query Quilt metadata.
+The code in this example shows you to enable (and test) use of the "Queries"
+pane of the Web Catalog for querying Quilt metadata for specific S3 bucket.
+
+## Prerequisite: Source=Quilt Roles for Athena users
+
+The initial Quilt deployment ships with two Source=Custom Roles that
+automatically grant access to all buckets that have been added to Quilt.
+Unfortunately, at this time those Roles are not compatible with accessing
+Athena.  Therefore, if you have not already, from the Quilt Admin Settings you
+must first:
+
+1. Create an empty Source=Quilt Role, e.g. "OurDefaultQuiltRole"
+1. Create a Source=Quilt Policy for read/write access to all relevant S3 Buckets
+2. Attach those to the above Role
+3. Assign that Role to the Quilt users that will need to access Athena
+
+See the in the [Users and Roles](https://docs.quiltdata.com/catalog/admin)
+documentation for more details.
+
+After installing the `athena_cfn`, you will need to:
+
+1. Grab the `PolicyName` from the output parameters
+2. Create a new Source=Quilt Policy, and attach it to that Role
 
 ## I. Install Athena CloudFormation templates
 
 There are two Athena templates in this directory.
-The first (`athena_cfn`) is only run once, and creates a bucket and workgroup usable by the entire account.
-The second (`athena_bucket_cfn`) must be run *once for each Quilt bucket* that should be queryable by Athena.
 
-### A. Per-Account Stack
+1. The first (`athena_cfn`) is only run once, and creates a results bucket and
+workgroup usable by the entire account (with appropriate permissions).
 
-Note: If you store large amounts of data in multiple regions, you may need to create and manage one workgroup per region rather than one per account.
+2. The second (`athena_bucket_cfn`) must be run *once for each Quilt bucket*
+that Athena should query. This creates bucket-specific tables and views which
+wrap the underlying Quilt metadata.
 
-1. Go to CloudFormation -> Stacks in the AWS Console for the region where most of your buckets are, e.g.: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks
+### A. athena_cfn
+
+Note: If you store large amounts of data in multiple regions, you may need to
+create and manage one such stack per _region_ (rather than per _account_).
+
+1. Go to CloudFormation -> Stacks in the AWS Console for the region where most
+of your buckets are, e.g.:
+https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks
 2. Click dropdown "Create stack" -> "With new resources (standard)"
 3. Select "Template is ready" (default)
 4. Select "Upload a template file" -> "Choose file"
@@ -30,8 +60,7 @@ Note: If you store large amounts of data in multiple regions, you may need to cr
 16. Select "Roll back all stack resources" (default)
 17. Click "Execute change set"
 
-
-### B. Per-Bucket Stack
+### B. athena_bucket_cfn
 
 From CloudFormation in the same Account and Region as before:
 
@@ -47,7 +76,9 @@ From CloudFormation in the same Account and Region as before:
 10. Click Next
 11. Click Next
 12. At the bottom, open the "Quick-create link" triangle
-13. Click "Open quick-create link" to get a wizard that makes it easy to rerun this for multiple buckets
+13. Click "**Open quick-create link**" to get a wizard that makes it easy to
+rerun this for multiple buckets. You can save and share this to quickly add
+other buckets to Quilt
 14. Click "Create change set"
 15. Wait until "Status = CREATE_COMPLETE" (may need to refresh using upper-right "cycle" icon)
 16. Review Changes
@@ -57,7 +88,7 @@ From CloudFormation in the same Account and Region as before:
 
 ### C. Modifications
 
-If you need to edit the cfn files, be sure to lint them before using.
+If you need to edit the CloudFormation files, be sure to lint them before use:
 
 ```
 $ pip3 install --upgrade taskcat cfn-lint
@@ -70,13 +101,15 @@ $ cfn-lint *_cfn.yml
 
 [SQL Alchemy](https://sqlalchemy.org/) is a convenient way to run database queries in Python, including Jupyter notebooks. The [pyathena](https://pypi.org/project/pyathena/) library provides the necessary bindings to connect to Athena from SQL Alchemy.
 
-Be sure the replace `BUCKET` with the name of Quilt bucket that already has CloudFormation tables.
+Be sure the replace `BUCKET` with the name of a Quilt bucket with the `athena_bucket_cfn` Stack.
 
 ### A. Create the Database Connection
 
 ```
 BUCKET="your-quilt-bucket-name"
 BUCKET_ID=BUCKET.replace("-","_")
+REGION="us-east-1"
+
 import sqlalchemy
 from sqlalchemy.engine import create_engine
 
@@ -84,9 +117,9 @@ conn_str = "awsathena+rest://@athena.{region_name}.amazonaws.com:443/"\
            "{schema_name}?s3_staging_dir={s3_staging_dir}"
 engine = create_engine(
     conn_str.format(
-        region_name="us-east-1",
+        region_name=REGION,
         schema_name="default",
-        s3_staging_dir=quote_plus(f"s3://BUCKET")
+        s3_staging_dir=quote_plus(f"s3://{BUCKET}")
     )
 )
 ```
