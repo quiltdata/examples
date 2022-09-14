@@ -1,25 +1,13 @@
 # Purpose:  Enable Athena functionality from Quilt web catalog
 #===============================================================================
 # aws cloudformation validate-template --template-body file://athena/athena_cfn.yml
+#  Scoped to ${AWS::StackName}
+
 AWSTemplateFormatVersion: "2010-09-09"
 Description: |
   Enable Athena from Quilt - Creates Athena Workgroup, Bucket, Policy
 
 Parameters:
-  CompanyName:
-    NoEcho: false
-    Description: Lowercase label representing your company, for use in naming buckets
-    Type: String
-    MinLength: 1
-    MaxLength: 32
-    AllowedPattern: '[a-z][-a-z0-9]*'
-  BucketSuffix:
-    Default: athena-quilt-output
-    NoEcho: false
-    Description: Suffix used for per-account Athena output bucket
-    Type: String
-    MinLength: 3
-    AllowedPattern: '[a-z][-a-z0-9]*'
   DatabaseName:
     Default: default
     NoEcho: false
@@ -40,10 +28,17 @@ Parameters:
     Type: String
     MinLength: 1
     AllowedPattern: '[A-Z][a-zA-Z0-9]*'
-  WorkgroupName:
-    Default: quilt-workgroup
+  SuffixBucket:
+    Default: query-output
     NoEcho: false
-    Description: Name for Quilt-specific Athena workgroup
+    Description: Suffix used for per-account Athena output bucket
+    Type: String
+    MinLength: 3
+    AllowedPattern: '[a-z][-a-z0-9]*'
+  SuffixWorkGroup:
+    Default: query
+    NoEcho: false
+    Description: Suffix for Quilt-specific Athena workgroup
     Type: String
     MinLength: 1
     MaxLength: 16
@@ -58,13 +53,13 @@ Resources:
     Type: "AWS::S3::Bucket"
     #DeletionPolicy: Retain
     Properties:
-      BucketName: !Join ["-", [!Ref CompanyName, !Ref BucketSuffix]]
+      BucketName: !Join ["-", [!Ref AWS::StackName, !Ref SuffixBucket]]
 
   AthenaQuiltWorkgroup:
     Type: AWS::Athena::WorkGroup
     DeletionPolicy: Delete
     Properties:
-      Name: !Ref WorkgroupName
+      Name: !Join ["-", [!Ref AWS::StackName, !Ref SuffixWorkGroup]]
       RecursiveDeleteOption: true
       WorkGroupConfiguration:
         PublishCloudWatchMetricsEnabled: true
@@ -89,7 +84,7 @@ Resources:
           Effect: Allow
           Action: athena:ListWorkGroups
           Resource: '*'
-        - Sid: AccessAthenaQuiltWorkgroup
+        - Sid: AccessQuiltAthenaWorkgroup
           Effect: Allow
           Action:
           - athena:Create*
