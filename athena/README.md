@@ -5,9 +5,9 @@ pane of the Web Catalog for querying Quilt metadata for specific S3 bucket.
 
 ## Prerequisite: Source=Quilt Roles for Athena users
 
-The initial Quilt deployment ships with two Source=Custom Roles that
+The initial Quilt deployment ships with two `Source=Custom` Roles that
 automatically grant access to all buckets that have been added to Quilt.
-Unfortunately, at this time those Roles are not compatible with accessing
+Unfortunately, at this time `Source=Custom` Roles are **not** compatible with accessing
 Athena.  Therefore, if you have not already, from the Quilt Admin Settings you
 must first:
 
@@ -21,8 +21,8 @@ documentation for more details.
 
 After installing the `athena_cfn`, you will need to:
 
-1. Grab the `PolicyName` from the output parameters
-2. Create a new Source=Quilt Policy, and attach it to that Role
+1. Grab the `PolicyName` from the template's Output parameters
+2. Create a new `Source=Custom` Policy with that ARN, and attach it to that Role
 
 ## I. Install Athena CloudFormation templates
 

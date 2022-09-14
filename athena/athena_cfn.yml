@@ -22,7 +22,7 @@ Parameters:
     Description: Regexp for Quilt-created Tables
     Type: String
   PolicyName:
-    Default: AthenaQuiltAccess
+    Default: QuiltAthenaAccess
     NoEcho: false
     Description: Granting Quilt access to these Athena resources
     Type: String
@@ -48,13 +48,13 @@ Parameters:
 # ARNCatalog:!Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
 
 Resources:
-  AthenaQuiltOutput:
+  QuiltAthenaOutput:
     Type: "AWS::S3::Bucket"
     #DeletionPolicy: Retain
     Properties:
       BucketName: !Join ["-", [!Ref AWS::StackName, !Ref SuffixWorkGroup, !Ref SuffixBucket]]
 
-  AthenaQuiltWorkgroup:
+  QuiltAthenaWorkgroup:
     Type: AWS::Athena::WorkGroup
     DeletionPolicy: Delete
     Properties:
@@ -63,18 +63,12 @@ Resources:
       WorkGroupConfiguration:
         PublishCloudWatchMetricsEnabled: true
         ResultConfiguration:
-          OutputLocation: !Join ["", ["s3://" , Ref: AthenaQuiltOutput, "/"]]
+          OutputLocation: !Join ["", ["s3://" , Ref: QuiltAthenaOutput, "/"]]
 
-  AthenaQuiltGroup:
-    DeletionPolicy: Delete
-    Type: AWS::IAM::Group
-
-  AthenaQuiltAccess:
+  QuiltAthenaAccess:
     DeletionPolicy: Delete
     Type: AWS::IAM::Policy
     Properties:
-      Groups:
-      - !Ref AthenaQuiltGroup
       PolicyName: !Ref PolicyName
       PolicyDocument:
         Version: '2012-10-17'
@@ -98,7 +92,7 @@ Resources:
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:datacatalog/*'
           - !Sub
             - 'arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${Workgroup}'
-            - {Workgroup: !Ref AthenaQuiltWorkgroup}
+            - {Workgroup: !Ref QuiltAthenaWorkgroup}
 
         - Sid: AccessGlueDatabases
           Effect: Allow
@@ -135,30 +129,25 @@ Resources:
           - s3:PutObject
           - s3:PutBucketPublicAccessBlock
           Resource:
-          - !GetAtt AthenaQuiltOutput.Arn
+          - !GetAtt QuiltAthenaOutput.Arn
 
 Outputs:
-  AthenaQuiltWorkgroup:
+  QuiltAthenaWorkgroup:
     Description: Athena Workgroup used by Quilt
-    Value: !Ref AthenaQuiltWorkgroup
+    Value: !Ref QuiltAthenaWorkgroup
     Export:
       Name: !Sub "${AWS::StackName}-workgroup"
-  AthenaQuiltPolicy:
+  QuiltAthenaPolicyName:
     Description: IAM Policy used by Quilt to access Athena resource
-    Value: !Ref AthenaQuiltAccess
+    Value: !Ref QuiltAthenaAccess
     Export:
       Name: !Sub "${AWS::StackName}-policy"
-  AthenaQuiltPolicyGroup:
-    Description: IAM Group associated with that Policy
-    Value: !Ref AthenaQuiltGroup
-    Export:
-      Name: !Sub "${AWS::StackName}-group"
-  AthenaQuiltOutputBucket:
+  QuiltAthenaOutputBucket:
     Description: S3 bucket used by Quilt Workgroup
-    Value: !Ref AthenaQuiltOutput
+    Value: !Ref QuiltAthenaOutput
     Export:
       Name: !Sub "${AWS::StackName}-bucket"
-  AthenaQuiltDatabase:
+  QuiltAthenaDatabase:
     Description: Name of Database used for Quilt package tables
     Value: !Ref DatabaseName
     Export:
