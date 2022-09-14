@@ -21,13 +21,6 @@ Parameters:
     NoEcho: false
     Description: Regexp for Quilt-created Tables
     Type: String
-  PolicyName:
-    Default: QuiltAthenaAccess
-    NoEcho: false
-    Description: Granting Quilt access to these Athena resources
-    Type: String
-    MinLength: 1
-    AllowedPattern: '[A-Z][a-zA-Z0-9]*'
   SuffixBucket:
     Default: output
     NoEcho: false
@@ -70,7 +63,6 @@ Resources:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       Path: /
-      PolicyName: !Ref PolicyName
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -133,16 +125,16 @@ Resources:
           - !GetAtt QuiltAthenaOutput.Arn
 
 Outputs:
-  QuiltAthenaWorkgroup:
-    Description: Athena Workgroup used by Quilt
-    Value: !Ref QuiltAthenaWorkgroup
-    Export:
-      Name: !Sub "${AWS::StackName}-workgroup"
   QuiltAthenaPolicyName:
     Description: IAM Policy used by Quilt to access Athena resource
     Value: !Ref QuiltAthenaAccess
     Export:
       Name: !Sub "${AWS::StackName}-policy"
+  QuiltAthenaWorkgroup:
+    Description: Athena Workgroup used by Quilt
+    Value: !Ref QuiltAthenaWorkgroup
+    Export:
+      Name: !Sub "${AWS::StackName}-workgroup"
   QuiltAthenaOutputBucket:
     Description: S3 bucket used by Quilt Workgroup
     Value: !Ref QuiltAthenaOutput
