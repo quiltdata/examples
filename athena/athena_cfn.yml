@@ -154,11 +154,6 @@ Outputs:
     Value: !Ref AthenaQuiltAccess
     Export:
       Name: !Sub "${AWS::StackName}-policy"
-  AthenaQuiltPolicyARN:
-    Description: Policy ARN used by Quilt to access Athena resource
-    Value: !GetAtt AthenaQuiltAccess.Arn
-    Export:
-      Name: !Sub "${AWS::StackName}-policy-arn"
   AthenaQuiltPolicyGroup:
     Description: IAM Group associated with that Policy
     Value: !Ref AthenaQuiltGroup
