@@ -3,7 +3,7 @@
 The code in this example shows you to enable (and test) use of the "Queries"
 pane of the Web Catalog for querying Quilt metadata for specific S3 bucket.
 
-## Prerequisite: Source=Quilt Roles for Athena users
+## I. Ensure Source=Quilt Roles for Athena users
 
 The initial Quilt deployment ships with two `Source=Custom` Roles that
 automatically grant access to all buckets that have been added to Quilt.
@@ -11,20 +11,14 @@ Unfortunately, at this time `Source=Custom` Roles are **not** compatible with ac
 Athena.  Therefore, if you have not already, from the Quilt Admin Settings you
 must first:
 
-1. Create an empty Source=Quilt Role, e.g. "OurDefaultQuiltRole"
-1. Create a Source=Quilt Policy for read/write access to all relevant S3 Buckets
-2. Attach those to the above Role
+1. Create an empty `Source=Quilt` Role, e.g. "AthenaQuiltAccess"
+1. Create a new `Source=Quilt` Policy with access to relevant S3 Buckets, and attach it to that Role
 3. Assign that Role to the Quilt users that will need to access Athena
 
-See the in the [Users and Roles](https://docs.quiltdata.com/catalog/admin)
-documentation for more details.
+See the [Users and Roles](https://docs.quiltdata.com/catalog/admin)
+documentation for more details about using Admin Settings to create and assign Roles.
 
-After installing the `athena_cfn`, you will need to:
-
-1. Grab the `PolicyName` from the template's Output parameters
-2. Create a new `Source=Custom` Policy with that ARN, and attach it to that Role
-
-## I. Install Athena CloudFormation templates
+## II. Install Athena CloudFormation templates
 
 There are two Athena templates in this directory.
 
@@ -35,7 +29,17 @@ workgroup usable by the entire account (with appropriate permissions).
 that Athena should query. This creates bucket-specific tables and views which
 wrap the underlying Quilt metadata.
 
-### A. athena_cfn
+### NOTE: Validating CloudFormation files
+
+If you need to edit the CloudFormation files, be sure to lint them before use:
+
+```
+$ pip3 install --upgrade taskcat cfn-lint
+$ taskcat lint && cfn-lint *_cfn.yml
+```
+
+
+### A. Installing athena_cfn
 
 Note: If you store large amounts of data in multiple regions, you may need to
 create and manage one such stack per _region_ (rather than per _account_).
@@ -48,8 +52,7 @@ https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/s
 4. Select "Upload a template file" -> "Choose file"
 5. Select "athena_cfn.yml" from this repository
 6. Click Next
-7. Enter "Stack name", e.g.: `your-company-athena-cfn`
-8. Enter "Company name", e.g.: `your-company` (for use in an S3 bucket name)
+7. Enter "Stack name", e.g.: `athena-quilt`
 9. Click Next
 10. Click Next
 11. Review then check "I acknowledge that AWS CloudFormation might create IAM resources"
@@ -60,41 +63,54 @@ https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/s
 16. Select "Roll back all stack resources" (default)
 17. Click "Execute change set"
 
-### B. athena_bucket_cfn
+### B. Create and attach the new Quilt Policy
 
-From CloudFormation in the same Account and Region as before:
+After installing `athena_cfn`, you will need to:
+
+1. Go to the "Outputs" tab of the installed template
+2. Copy the `AthenaPolicy` ARN
+3. Go back to "Admin Settings" in your Quilt Repository
+4. Scroll down to "Policies" and click "+" create a new one
+5. Enter the friendly name, e.g. "QuiltAthenaAccess"
+6. Check "Manually set ARN instead of configuring per-bucket permissions"
+7. Paste in the ARN from step (2)
+8. Click "Attach current policy to roles..."
+9. Select the Role you created in Section I.
+10. Click "Create"
+
+Note that it may take a few minutes for the policy credential cache to update.
+
+### C. Get link for athena_bucket_cfn
+
+Go to CloudFormation in the same Account and Region as before:
 
 1. Click dropdown "Create stack" -> "With new resources (standard)"
 2. Select "Template is ready" (default)
 3. Select "Upload a template file" -> "Choose file"
 4. Select "athena_bucket_cfn.yml" from this repository
 5. Click Next
-6. Enter "Stack name", e.g.: `your-bucket-athena-cfn`
-7. Enter "QuiltAthenaStack", e.g.: `your-company-athena-cfn` (from part A)
+6. Enter a new "Stack name", e.g.: `your-bucket-athena-quilt`
+7. Enter "QuiltAthenaStack", e.g.: `athena-quilt` (from part A)
 8. Enter "QuiltBucket", e.g.: `your-bucket` (as in 6)
 9. Enter "QuiltBucketID", e.g.: `your_bucket` (with '-' replaced by '_')
 10. Click Next
 11. Click Next
 12. At the bottom, open the "Quick-create link" triangle
 13. Click "**Open quick-create link**" to get a wizard that makes it easy to
-rerun this for multiple buckets. You can save and share this to quickly add
-other buckets to Quilt
-14. Click "Create change set"
-15. Wait until "Status = CREATE_COMPLETE" (may need to refresh using upper-right "cycle" icon)
-16. Review Changes
-17. Click "Execute" in upper right
-18. Select "Roll back all stack resources" (default)
-19. Click "Execute change set"
+rerun this for multiple buckets.
 
-### C. Modifications
+Save this link in a shared space so you and other AWS users can easily index additional Quilt buckets.
 
-If you need to edit the CloudFormation files, be sure to lint them before use:
+### D. Use quick-create link for each bucket you want to index
 
-```
-$ pip3 install --upgrade taskcat cfn-lint
-$ taskcat lint
-$ cfn-lint *_cfn.yml
-```
+1. Open the link from (C)
+2. Update the stack name and bucket parameters
+3. Click "Create change set"
+4. Wait until "Status = CREATE_COMPLETE" (may need to refresh using upper-right "cycle" icon)
+5. Review Changes
+6. Click "Execute" in upper right
+7. Select "Roll back all stack resources" (default)
+8. Click "Execute change set"
 
 
 ## II. Querying Athena Tables in SQL Alchemy

@@ -9,6 +9,12 @@ Description: |
   Configure Athena tables for a Quilt Bucket
 
 Parameters:
+  QuiltAthenaStack:
+    NoEcho: false
+    Description: Parent stack defining Athena Database, Workgroup and Bucket
+    Type: String
+    MinLength: 1
+    AllowedPattern: '[a-zA-Z][-a-zA-Z0-9]*'
   QuiltBucket:
     NoEcho: false
     Description: Name of an S3 Bucket containing Quilt packages
@@ -21,12 +27,6 @@ Parameters:
     Type: String
     MinLength: 1
     AllowedPattern: '[a-z][_a-z0-9]*'
-  QuiltAthenaStack:
-    NoEcho: false
-    Description: Parent stack defining Athena Database, Workgroup and Bucket
-    Type: String
-    MinLength: 1
-    AllowedPattern: '[a-zA-Z][-a-zA-Z0-9]*'
 
 #
 # Input Parsing

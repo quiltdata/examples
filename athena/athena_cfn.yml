@@ -125,24 +125,24 @@ Resources:
           - !GetAtt QuiltAthenaOutput.Arn
 
 Outputs:
-  QuiltAthenaPolicyName:
+  AthenaPolicy:
     Description: IAM Policy used by Quilt to access Athena resource
     Value: !Ref QuiltAthenaAccess
     Export:
       Name: !Sub "${AWS::StackName}-policy"
-  QuiltAthenaWorkgroup:
-    Description: Athena Workgroup used by Quilt
-    Value: !Ref QuiltAthenaWorkgroup
-    Export:
-      Name: !Sub "${AWS::StackName}-workgroup"
-  QuiltAthenaOutputBucket:
-    Description: S3 bucket used by Quilt Workgroup
-    Value: !Ref QuiltAthenaOutput
-    Export:
-      Name: !Sub "${AWS::StackName}-bucket"
-  QuiltAthenaDatabase:
+  Database:
     Description: Name of Database used for Quilt package tables
     Value: !Ref DatabaseName
     Export:
       Name: !Sub "${AWS::StackName}-database"
+  OutputBucket:
+    Description: S3 bucket used by Quilt Workgroup
+    Value: !Ref QuiltAthenaOutput
+    Export:
+      Name: !Sub "${AWS::StackName}-bucket"
+  Workgroup:
+    Description: Athena Workgroup used by Quilt
+    Value: !Ref QuiltAthenaWorkgroup
+    Export:
+      Name: !Sub "${AWS::StackName}-workgroup"
 
