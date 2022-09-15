@@ -3,22 +3,7 @@
 The code in this example shows you to enable (and test) use of the "Queries"
 pane of the Web Catalog for querying Quilt metadata for specific S3 bucket.
 
-## I. Ensure Source=Quilt Roles for Athena users
-
-The initial Quilt deployment ships with two `Source=Custom` Roles that
-automatically grant access to all buckets that have been added to Quilt.
-Unfortunately, at this time `Source=Custom` Roles are **not** compatible with accessing
-Athena.  Therefore, if you have not already, from the Quilt Admin Settings you
-must first:
-
-1. Create an empty `Source=Quilt` Role, e.g. "AthenaQuiltAccess"
-1. Create a new `Source=Quilt` Policy with access to relevant S3 Buckets, and attach it to that Role
-3. Assign that Role to the Quilt users that will need to access Athena
-
-See the [Users and Roles](https://docs.quiltdata.com/catalog/admin)
-documentation for more details about using Admin Settings to create and assign Roles.
-
-## II. Install Athena CloudFormation templates
+## Overview
 
 There are two Athena templates in this directory.
 
@@ -37,6 +22,24 @@ If you need to edit the CloudFormation files, be sure to lint them before use:
 $ pip3 install --upgrade taskcat cfn-lint
 $ taskcat lint && cfn-lint *_cfn.yml
 ```
+
+## I. Ensure Source=Quilt Roles for Athena users
+
+The initial Quilt deployment ships with two `Source=Custom` Roles that
+automatically grant access to all buckets that have been added to Quilt.
+Unfortunately, at this time `Source=Custom` Roles are **not** compatible with accessing
+Athena.  Therefore, if you have not already, from the Quilt Admin Settings you
+must first:
+
+1. Create an empty `Source=Quilt` Role, e.g. "AthenaQuiltAccess"
+1. Create a new `Source=Quilt` Policy with access to relevant S3 Buckets, and attach it to that Role
+3. Assign that Role to the Quilt users that will need to access Athena
+
+See the [Users and Roles](https://docs.quiltdata.com/catalog/admin)
+documentation for more details about using Admin Settings to create and assign Roles.
+
+## II. Create Athena Workgroup
+
 
 
 ### A. Installing athena_cfn
@@ -92,7 +95,9 @@ As with (B), you will need to:
 6. Add a user-friendly description, e.g. "Athena Query Output"
 7. Click "Add"
 
-### D. Get link for athena_bucket_cfn
+## III. Enable Athena for Individual Buckets
+
+### A. Get link for athena_bucket_cfn
 
 Go to CloudFormation in the same Account and Region as before:
 
@@ -113,7 +118,7 @@ rerun this for multiple buckets.
 
 Save this link in a shared space so you and other AWS users can easily index additional Quilt buckets.
 
-### E. Use quick-create link for each bucket you want to index
+### B. Use quick-create link for each bucket you want to index
 
 1. Open the link from (C)
 2. Update the stack name and bucket parameters
@@ -124,78 +129,30 @@ Save this link in a shared space so you and other AWS users can easily index add
 7. Select "Roll back all stack resources" (default)
 8. Click "Execute change set"
 
-### F. Manually invoke view-creating queries
+### C. Manually invoke view-creating queries
 
 Unfortunately, CloudFormation does not automatically generate the proper views.
-To complete setup, you will need to manually execute two pre-defined queries.
+To complete setup, you will need to manually execute two pre-defined queries for each bucket:
 
 1. Login to your Quilt Repository
 2. Go to the "Queries" tab
 3. Click "Select workgroup" (matches the stack name you chose)
 4. Click "Select query"
-5. Select "create...quilt_pacakges_view" and click "Run Query"
+5. Find the "create..." queries corresponding to this bucket
+5. Select "create...quilt_packages_view" and click "Run Query"
 6. Select "create...quilt_objects_view" and click "Run Query"
 
+### D. Test running Athena Queries
 
-## II. Querying Athena Tables in SQL Alchemy
+From that same Queries tab and workgroup:
 
-[SQL Alchemy](https://sqlalchemy.org/) is a convenient way to run database queries in Python, including Jupyter notebooks. The [pyathena](https://pypi.org/project/pyathena/) library provides the necessary bindings to connect to Athena from SQL Alchemy.
+1. Click "Select query"
+2. Select "preview...quilt_objects_view" and click "Run Query"
+3. Click "Filter and Plot" to see (and try out) configuration options
+4. Hover over the down arrow in the lower left of the plot
+5. Click the "Export" button that appears
+6. Under "Save As" type "<bucket-name>-test"
+7. Select Current view "<bucket-name>-test.csv"
 
-Be sure the replace `BUCKET` with the name of a Quilt bucket with the `athena_bucket_cfn` Stack.
-
-### A. Create the Database Connection
-
-```
-BUCKET="your-quilt-bucket-name"
-BUCKET_ID=BUCKET.replace("-","_")
-REGION="us-east-1"
-
-import sqlalchemy
-from sqlalchemy.engine import create_engine
-
-conn_str = "awsathena+rest://@athena.{region_name}.amazonaws.com:443/"\
-           "{schema_name}?s3_staging_dir={s3_staging_dir}"
-engine = create_engine(
-    conn_str.format(
-        region_name=REGION,
-        schema_name="default",
-        s3_staging_dir=quote_plus(f"s3://{BUCKET}")
-    )
-)
-```
-
-### B. Run a Query that Joins the Views
-
-SQL Alchemy wraps SQL operations in Python objects and lets users create complex SQL queries in Python. The example below executes a join query on the two package metadata views created by the script and returns the result as a Pandas DataFrame.
-
-```
-import pandas as pd
-from sqlalchemy import column, join, text
-from sqlalchemy.sql.expression import select
-from sqlalchemy.sql.schema import Table, MetaData
-
-pkgnames_view = Table(
-    f"{BUCKET_ID}_quilt_packages_view",
-    MetaData(bind=engine),
-    autoload=True
-)
-
-manifests_view = Table(
-    f"{BUCKET_ID}_quilt_objects_view",
-    MetaData(bind=engine),
-    autoload=True
-)
-
-q = select(
-        join(
-            pkgnames_view,
-            manifests_view,
-            pkgnames_view.c.hash == manifests_view.c.tophash
-        )
-    )
-df = pd.read_sql(q, engine)
-df
-
-```
-
+The results will be saved on your local machine.
 

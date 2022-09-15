@@ -209,6 +209,20 @@ Resources:
             PkgView: !Join ["_", [!Ref PackagesTable, view]]
             View: !Join ["_", [!Ref QuiltBucketID, "quilt_objects_view"]]
 
+  ObjectsViewTest:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      WorkGroup:
+        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "workgroup"]]
+      Database:
+        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
+      Name: !Join ["_", [preview, !Ref QuiltBucketID, "quilt_objects_view"]]
+      Description: !Join [" ", ["Preview data from", !Ref ManifestsTable]]
+      QueryString:
+        Fn::Sub:
+          - "SELECT * FROM ${View} LIMIT 20"
+          - View: !Join ["_", [!Ref QuiltBucketID, "quilt_objects_view"]]
+
 Outputs:
   ManifestsTable:
     Value: !Ref ManifestsTable
