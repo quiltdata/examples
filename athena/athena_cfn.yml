@@ -123,6 +123,7 @@ Resources:
           - s3:PutBucketPublicAccessBlock
           Resource:
           - !GetAtt QuiltAthenaOutput.Arn
+          - !Join ["/", [!GetAtt QuiltAthenaOutput.Arn, '*']]
 
 Outputs:
   AthenaPolicy:
