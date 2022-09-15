@@ -80,7 +80,19 @@ After installing `athena_cfn`, you will need to:
 
 Note that it may take a few minutes for the policy credential cache to update.
 
-### C. Get link for athena_bucket_cfn
+### C. Grant Quilt access to the new Bucket
+
+As with (B), you will need to:
+
+1. Go to the "Outputs" tab of the installed template
+2. Copy the `OutputBucket` value
+3. Go back to "Admin Settings" in your Quilt Repository
+4. Go to "Buckets" tab and click "+" create a new one
+5. Paste that value into "Name"
+6. Add a user-friendly description, e.g. "Athena Query Output"
+7. Click "Add"
+
+### D. Get link for athena_bucket_cfn
 
 Go to CloudFormation in the same Account and Region as before:
 
@@ -101,7 +113,7 @@ rerun this for multiple buckets.
 
 Save this link in a shared space so you and other AWS users can easily index additional Quilt buckets.
 
-### D. Use quick-create link for each bucket you want to index
+### E. Use quick-create link for each bucket you want to index
 
 1. Open the link from (C)
 2. Update the stack name and bucket parameters
@@ -112,7 +124,7 @@ Save this link in a shared space so you and other AWS users can easily index add
 7. Select "Roll back all stack resources" (default)
 8. Click "Execute change set"
 
-### E. Manually invoke view-creating queries
+### F. Manually invoke view-creating queries
 
 Unfortunately, CloudFormation does not automatically generate the proper views.
 To complete setup, you will need to manually execute two pre-defined queries.
