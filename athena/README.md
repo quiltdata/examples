@@ -112,6 +112,18 @@ Save this link in a shared space so you and other AWS users can easily index add
 7. Select "Roll back all stack resources" (default)
 8. Click "Execute change set"
 
+### E. Manually invoke view-creating queries
+
+Unfortunately, CloudFormation does not automatically generate the proper views.
+To complete setup, you will need to manually execute two pre-defined queries.
+
+1. Login to your Quilt Repository
+2. Go to the "Queries" tab
+3. Click "Select workgroup" (matches the stack name you chose)
+4. Click "Select query"
+5. Select "create...quilt_pacakges_view" and click "Run Query"
+6. Select "create...quilt_objects_view" and click "Run Query"
+
 
 ## II. Querying Athena Tables in SQL Alchemy
 

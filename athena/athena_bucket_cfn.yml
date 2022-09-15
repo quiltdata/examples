@@ -218,6 +218,14 @@ Outputs:
     Value: !Ref PackagesTable
     Export:
       Name: !Sub "${AWS::StackName}-packages-table"
+  ObjectsView:
+    Value: !Join ["_", [!Ref QuiltBucketID, "quilt_objects_view"]]
+    Export:
+      Name: !Sub "${AWS::StackName}-objects-view"
+  PackagesView:
+    Value: !Join ["_", [!Ref PackagesTable, view]]
+    Export:
+      Name: !Sub "${AWS::StackName}-packages-view"
   PackagesViewCreator:
     Value: !Ref PackagesViewCreator
     Export:
