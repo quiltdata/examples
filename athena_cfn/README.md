@@ -40,9 +40,7 @@ documentation for more details about using Admin Settings to create and assign R
 
 ## II. Create Athena Workgroup
 
-
-
-### A. Installing athena_cfn
+### A. Install `athena_cfn` CloudFormation template
 
 Note: If you store large amounts of data in multiple regions, you may need to
 create and manage one such stack per _region_ (rather than per _account_).
@@ -142,7 +140,7 @@ To complete setup, you will need to manually execute two pre-defined queries for
 5. Select "create...quilt_packages_view" and click "Run Query"
 6. Select "create...quilt_objects_view" and click "Run Query"
 
-### D. Test running Athena Queries
+### D. Run Athena Queries
 
 From that same Queries tab and workgroup:
 
