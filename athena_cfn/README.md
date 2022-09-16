@@ -95,6 +95,10 @@ As with (B), you will need to:
 
 ## III. Enable Athena for Individual Buckets
 
+Note that this process assumes you have already:
+* added the relevant S3 bucket to the Quilt registry
+* created at least one package in that bucket
+
 ### A. Get link for athena_bucket_cfn
 
 Go to CloudFormation in the same Account and Region as before:
