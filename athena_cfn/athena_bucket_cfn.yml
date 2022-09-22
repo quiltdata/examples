@@ -127,7 +127,7 @@ Resources:
         Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "workgroup"]]
       Database:
         Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
-      Name: !Join ["_", [create, !Ref PackagesTable, view]]
+      Name: !Join ["_", [create1, !Ref PackagesTable, view]]
       Description: !Join [" ", ["Quilt Query to create View from", !Ref PackagesTable]]
       QueryString:
         Fn::Sub:
@@ -171,7 +171,7 @@ Resources:
         Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "workgroup"]]
       Database:
         Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
-      Name: !Join ["_", [create, !Ref QuiltBucketID, "quilt_objects_view"]]
+      Name: !Join ["_", [create2, !Ref QuiltBucketID, "quilt_objects_view"]]
       Description: !Join [" ", ["Quilt Query to create View from", !Ref ManifestsTable]]
       QueryString:
         Fn::Sub:
