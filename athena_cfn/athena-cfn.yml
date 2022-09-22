@@ -75,11 +75,7 @@ Resources:
           Action:
           - athena:Create*
           - athena:*Get*
-          - athena:ListDataCatalogs
-          - athena:ListDatabases
-          - athena:ListNamedQueries
-          - athena:ListPreparedStatements
-          - athena:ListQueryExecutions
+          - athena:List*
           - athena:StartQueryExecution
           Resource:
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
