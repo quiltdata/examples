@@ -75,6 +75,7 @@ Resources:
           Action:
           - athena:Create*
           - athena:*Get*
+          - athena:ListDataCatalogs
           - athena:ListDatabases
           - athena:ListNamedQueries
           - athena:ListPreparedStatements
