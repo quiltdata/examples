@@ -10,19 +10,16 @@ Description: |
 
 Parameters:
   QuiltAthenaStack:
-    NoEcho: false
     Description: Parent stack defining Athena Database, Workgroup and Bucket
     Type: String
     MinLength: 1
     AllowedPattern: '[a-zA-Z][-a-zA-Z0-9]*'
   QuiltBucket:
-    NoEcho: false
     Description: Name of an S3 Bucket containing Quilt packages
     Type: String
     MinLength: 1
     AllowedPattern: '[a-z][-a-z0-9]*'
   QuiltBucketID:
-    NoEcho: false
     Description: SQL-compatible version of QuiltBucket name, to use as a prefix
     Type: String
     MinLength: 1
@@ -104,7 +101,6 @@ Resources:
         TableType: EXTERNAL_TABLE
         Parameters:
           has_encrypted_data: false
-          #transient_lastDdlTime: 1557626200
         StorageDescriptor:
           Location:
             Fn::Sub:

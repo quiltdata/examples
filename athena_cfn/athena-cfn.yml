@@ -16,10 +16,10 @@ Parameters:
     MinLength: 1
     MaxLength: 16
     AllowedPattern: '[a-z][_a-z]*'
-  DatabaseTableRegex:
+  DatabaseTablePattern:
     Default: '*_quilt_*'
     NoEcho: false
-    Description: Regexp for Quilt-created Tables
+    Description: Pattern to identify Quilt-created Tables
     Type: String
   SuffixBucket:
     Default: output
@@ -42,7 +42,7 @@ Parameters:
 
 Resources:
   QuiltAthenaOutput:
-    Type: "AWS::S3::Bucket"
+    Type: AWS::S3::Bucket
     #DeletionPolicy: Retain
     Properties:
       BucketName: !Join ["-", [!Ref AWS::StackName, !Ref SuffixWorkGroup, !Ref SuffixBucket]]
@@ -105,7 +105,7 @@ Resources:
             - {Database: !Ref DatabaseName}
           - !Sub
             - 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${Database}/${Tables}'
-            - {Database: !Ref DatabaseName, Tables: !Ref DatabaseTableRegex}
+            - {Database: !Ref DatabaseName, Tables: !Ref DatabaseTablePattern}
         - Sid: AccessQuiltAthenaOutputBucket
           Effect: Allow
           Action:
@@ -115,7 +115,6 @@ Resources:
           - s3:ListBucketMultipartUploads
           - s3:ListMultipartUploadParts
           - s3:AbortMultipartUpload
-          - s3:CreateBucket
           - s3:PutObject
           - s3:PutBucketPublicAccessBlock
           Resource:
