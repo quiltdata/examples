@@ -45,18 +45,18 @@ Resources:
     Type: AWS::S3::Bucket
     #DeletionPolicy: Retain
     Properties:
-      BucketName: !Join ["-", [!Ref AWS::StackName, !Ref SuffixWorkGroup, !Ref SuffixBucket]]
+      BucketName: !Sub "${AWS::StackName}-${SuffixWorkGroup}-${SuffixBucket}"
 
   QuiltAthenaWorkgroup:
     Type: AWS::Athena::WorkGroup
     DeletionPolicy: Delete
     Properties:
-      Name: !Join ["-", [!Ref AWS::StackName, !Ref SuffixWorkGroup]]
+      Name: !Sub "${AWS::StackName}-${SuffixWorkGroup}"
       RecursiveDeleteOption: true
       WorkGroupConfiguration:
         PublishCloudWatchMetricsEnabled: true
         ResultConfiguration:
-          OutputLocation: !Join ["", ["s3://" , Ref: QuiltAthenaOutput, "/"]]
+          OutputLocation: !Sub 's3://${QuiltAthenaOutput}/'
 
   QuiltAthenaAccess:
     DeletionPolicy: Delete
@@ -119,7 +119,7 @@ Resources:
           - s3:PutBucketPublicAccessBlock
           Resource:
           - !GetAtt QuiltAthenaOutput.Arn
-          - !Join ["/", [!GetAtt QuiltAthenaOutput.Arn, '*']]
+          - !Sub "${QuiltAthenaOutput.Arn}/*"
 
 Outputs:
   AthenaPolicy:

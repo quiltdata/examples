@@ -48,9 +48,9 @@ Resources:
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseName:
-        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
       TableInput:
-        Name: !Join ["_", [!Ref QuiltBucketID, "quilt_manifests"]]
+        Name: !Sub "${QuiltBucketID}_quilt_manifests"
         Description:
           Fn::Sub:
             - "Table of all the manifests in s3://${Bucket} (all package-level and object-level metadata)"
@@ -92,21 +92,15 @@ Resources:
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseName:
-        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
       TableInput:
-        Name: !Join ["_", [!Ref QuiltBucketID, "quilt_packages"]]
-        Description:
-          Fn::Sub:
-            - "Make package of top hashes from s3://${Bucket} available in Athena"
-            - {Bucket: !Ref QuiltBucket}
+        Name: !Sub "${QuiltBucketID}_quilt_packages"
+        Description: !Sub "Make package of top hashes from s3://${QuiltBucket} available in Athena"
         TableType: EXTERNAL_TABLE
         Parameters:
           has_encrypted_data: false
         StorageDescriptor:
-          Location:
-            Fn::Sub:
-            - "s3://${Bucket}/.quilt/named_packages"
-            - {Bucket: !Ref QuiltBucket}
+          Location: !Sub "s3://${QuiltBucket}/.quilt/named_packages"
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
           SerdeInfo:
@@ -121,11 +115,11 @@ Resources:
     Type: AWS::Athena::NamedQuery
     Properties:
       WorkGroup:
-        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "workgroup"]]
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-workgroup"
       Database:
-        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
-      Name: !Join ["_", [create1, !Ref PackagesTable, view]]
-      Description: !Join [" ", ["Quilt Query to create View from", !Ref PackagesTable]]
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
+      Name: !Sub "create1_${PackagesTable}_view"
+      Description: !Sub "Quilt Query to create View from ${PackagesTable}"
       QueryString:
         Fn::Sub:
           - |
@@ -159,17 +153,17 @@ Resources:
 
           - Manifests: !Ref ManifestsTable
             Packages: !Ref PackagesTable
-            View: !Join ["_", [!Ref PackagesTable, view]]
+            View: !Sub "${PackagesTable}_view"
 
   ObjectsViewCreator:
     Type: AWS::Athena::NamedQuery
     Properties:
       WorkGroup:
-        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "workgroup"]]
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-workgroup"
       Database:
-        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
-      Name: !Join ["_", [create2, !Ref QuiltBucketID, "quilt_objects_view"]]
-      Description: !Join [" ", ["Quilt Query to create View from", !Ref ManifestsTable]]
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
+      Name: !Sub "create2_${QuiltBucketID}_quilt_objects_view"
+      Description: !Sub "Quilt Query to create View from ${ManifestsTable}"
       QueryString:
         Fn::Sub:
           - |
@@ -203,22 +197,19 @@ Resources:
             ON npv."hash" = mv."tophash";
 
           - Manifests: !Ref ManifestsTable
-            PkgView: !Join ["_", [!Ref PackagesTable, view]]
-            View: !Join ["_", [!Ref QuiltBucketID, "quilt_objects_view"]]
+            PkgView: !Sub "${PackagesTable}_view"
+            View: !Sub "${QuiltBucketID}_quilt_objects_view"
 
   ObjectsViewTest:
     Type: AWS::Athena::NamedQuery
     Properties:
       WorkGroup:
-        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "workgroup"]]
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-workgroup"
       Database:
-        Fn::ImportValue: !Join ["-", [!Ref QuiltAthenaStack, "database"]]
-      Name: !Join ["_", [preview, !Ref QuiltBucketID, "quilt_objects_view"]]
-      Description: !Join [" ", ["Preview data from", !Ref ManifestsTable]]
-      QueryString:
-        Fn::Sub:
-          - "SELECT * FROM ${View} LIMIT 20"
-          - View: !Join ["_", [!Ref QuiltBucketID, "quilt_objects_view"]]
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
+      Name: !Sub "preview_${QuiltBucketID}_quilt_objects_view"
+      Description: !Sub "Preview data from ${ManifestsTable}"
+      QueryString: !Sub "SELECT * FROM ${QuiltBucketID}_quilt_objects_view LIMIT 20"
 
 Outputs:
   ManifestsTable:
@@ -230,11 +221,11 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-packages-table"
   ObjectsView:
-    Value: !Join ["_", [!Ref QuiltBucketID, "quilt_objects_view"]]
+    Value: !Sub "${QuiltBucketID}_quilt_objects_view"
     Export:
       Name: !Sub "${AWS::StackName}-objects-view"
   PackagesView:
-    Value: !Join ["_", [!Ref PackagesTable, view]]
+    Value: !Sub "${PackagesTable}_view"
     Export:
       Name: !Sub "${AWS::StackName}-packages-view"
   PackagesViewCreator:
