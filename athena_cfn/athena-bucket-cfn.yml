@@ -13,11 +13,13 @@ Parameters:
     Description: Parent stack defining Athena Database, Workgroup and Bucket
     Type: String
     MinLength: 1
+    MaxLength: 128
     AllowedPattern: '[a-zA-Z][-a-zA-Z0-9]*'
   QuiltBucket:
     Description: Name of an S3 Bucket containing Quilt packages
     Type: String
-    MinLength: 1
+    MinLength: 3
+    MaxLength: 63
     AllowedPattern: '[a-z][-a-z0-9]*'
   QuiltBucketID:
     Description: SQL-compatible version of QuiltBucket name, to use as a prefix
