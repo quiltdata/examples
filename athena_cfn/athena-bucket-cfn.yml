@@ -51,10 +51,7 @@ Resources:
         Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
       TableInput:
         Name: !Sub "${QuiltBucketID}_quilt_manifests"
-        Description:
-          Fn::Sub:
-            - "Table of all the manifests in s3://${Bucket} (all package-level and object-level metadata)"
-            - {Bucket: !Ref QuiltBucket}
+        Description: !Sub "Table of all the manifests in s3://${QuiltBucket} (all package-level and object-level metadata)"
         TableType: EXTERNAL_TABLE
         Parameters:
           has_encrypted_data: false
@@ -65,10 +62,7 @@ Resources:
             Parameters:
               ignore.malformed.json: true
             SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
-          Location:
-            Fn::Sub:
-              - "s3://${Bucket}/.quilt/packages"
-              - {Bucket: !Ref QuiltBucket}
+          Location: !Sub "s3://${QuiltBucket}/.quilt/packages"
           Columns:
           - Name: logical_key
             Type: string
