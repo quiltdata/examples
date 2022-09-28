@@ -5,9 +5,7 @@
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/walkthrough-crossstackref.html
 
 AWSTemplateFormatVersion: "2010-09-09"
-Description: |
-  Configure Athena tables for a Quilt Bucket
-
+Description: Configure Athena tables for a Quilt Bucket
 Parameters:
   QuiltAthenaStack:
     Description: Parent stack defining Athena Database, Workgroup and Bucket
@@ -24,7 +22,8 @@ Parameters:
   QuiltBucketID:
     Description: SQL-compatible version of QuiltBucket name, to use as a prefix
     Type: String
-    MinLength: 1
+    MinLength: 3
+    MaxLength: 63
     AllowedPattern: '[a-z][_a-z0-9]*'
 
 #

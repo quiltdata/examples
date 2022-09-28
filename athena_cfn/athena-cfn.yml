@@ -10,30 +10,30 @@ Description: |
 Parameters:
   DatabaseName:
     Default: default
-    NoEcho: false
     Description: Name of an EXISTING Athena database to use for Quilt tables
     Type: String
     MinLength: 1
-    MaxLength: 16
+    MaxLength: 255
     AllowedPattern: '[a-z][_a-z]*'
   DatabaseTablePattern:
     Default: '*_quilt_*'
-    NoEcho: false
     Description: Pattern to identify Quilt-created Tables
     Type: String
+    MinLength: 1
+    MaxLength: 32
   SuffixBucket:
     Default: output
-    NoEcho: false
     Description: Suffix for per-workgroup Athena output bucket
     Type: String
     MinLength: 3
+    MaxLength: 16
     AllowedPattern: '[a-z][a-z0-9]*'
   SuffixWorkGroup:
     Default: query
-    NoEcho: false
     Description: Suffix for Quilt-specific Athena workgroup
     Type: String
     MinLength: 3
+    MaxLength: 16
     AllowedPattern: '[a-z][a-z0-9]*'
 
 # Non-parameters (no intrinsics allowed)
