@@ -10,6 +10,6 @@ project:
     QSS3BucketRegion: "$[taskcat_current_region]"
 tests:
   default:
-    template: ./athena_cfn.yml
+    template: ./athena-cfn.yml
   bucket:
-    template: ./athena_bucket_cfn.yml
+    template: ./athena-bucket-cfn.yml

@@ -1,6 +1,6 @@
 # Purpose:  Enable Athena functionality from Quilt web catalog
 #===============================================================================
-# aws cloudformation validate-template --template-body file://athena/athena_cfn.yml
+# aws cloudformation validate-template --template-body file://athena/athena-cfn.yml
 #  Scoped to ${AWS::StackName}
 
 AWSTemplateFormatVersion: "2010-09-09"

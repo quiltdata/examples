@@ -10,7 +10,7 @@ be sure to lint them before using:
 
 ```
 $ pip3 install --upgrade taskcat cfn-lint
-$ taskcat lint && cfn-lint *_cfn.yml
+$ taskcat lint && cfn-lint *cfn.yml
 ```
 
 ## I. Prologue: Ensure Source=Quilt Roles for Athena users
