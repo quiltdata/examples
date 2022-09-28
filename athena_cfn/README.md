@@ -80,12 +80,28 @@ https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/s
 1. Select "Roll back all stack resources" (default)
 1. Click "Execute change set"
 
-### B. Create and attach the new Quilt Policy
+You need to wait until the `athena-cfn.yml` stack creation completes,
+so you can use its Outputs for the following steps.
+
+### B. Extend Quilt's Permission Boundary
+
+1. Go to the "Outputs" tab of the installed template
+1. Copy the `AthenaPolicy` ARN from the "Value" column
+1. Go to your original Quilt CloudFormation stack
+1. Click "Update" -> "Use current template"
+1. Scroll down to "Other parameters" -> "ManagedUserRoleExtraPolicies"
+1. Paste in that ARN (adding a comma if necessary)
+1. Click "Next" and then "Next"
+1. Check "I acknowledge that AWS CloudFormation might create IAM resources with custom names."
+1. Click "Update Stack"
+
+
+### C. Create and attach the new Quilt Policy
 
 After the `athena-cfn.yml` stack is created, you will need to:
 
 1. Go to the "Outputs" tab of the installed template
-1. Copy the `AthenaPolicy` ARN
+1. Copy the `AthenaPolicy` ARN from the "Value" column
 1. Go back to "Admin Settings" in your Quilt Repository
 1. Scroll down to "Policies" and click "+" create a new one
 1. Enter the friendly name, e.g. "QuiltAthenaAccess"
@@ -97,7 +113,7 @@ After the `athena-cfn.yml` stack is created, you will need to:
 
 Note that it may take a few minutes for the policy credential cache to update.
 
-### C. Grant Quilt access to the new Bucket
+### D. Grant Quilt access to the new Bucket
 
 As with (B), you will need to:
 
@@ -113,6 +129,7 @@ As with (B), you will need to:
 
 Note that this process assumes you have already:
 * added the relevant S3 bucket to the Quilt registry
+* added that bucket to a Policy for the Role from (I)
 * created at least one package in that bucket
 
 ### A. Get link for athena-bucket-cfn
