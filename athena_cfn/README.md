@@ -1,9 +1,9 @@
 # Query Quilt Package Metadata in AWS Athena
 
-The code in this example shows you to enable (and test) use of the "Queries"
-pane of the Web Catalog for querying Quilt metadata for specific S3 bucket.
+The code in this example shows you how to enable use of the "Queries"
+tab of the Quilt Catalog for querying Quilt [metadata](https://docs.quiltdata.com/catalog/metadata) for a given bucket using [Athena SQL](https://docs.quiltdata.com/advanced/athena).
 
-### NOTE: Validating CloudFormation files
+### Validating CloudFormation files
 
 If for any reason you need to edit the CloudFormation files,
 be sure to lint them before using:
@@ -17,38 +17,37 @@ $ taskcat lint && cfn-lint *cfn.yml
 
 The initial Quilt deployment ships with two `Source=Custom` Roles that
 automatically grant access to all buckets that have been added to Quilt.
-Unfortunately, at this time `Source=Custom` Roles are **not** compatible with accessing
-Athena.  Therefore, if you have not already, from the Quilt Admin Settings you
-must first:
+At this time `Source=Custom` Roles are incompatible with custom policies
+(including Athena policies). If you have not already,
+before proceeding you must do the following in the Quilt Admin panel:
 
-1. Create an empty `Source=Quilt` Role, e.g. "AthenaQuiltAccess"
-1. Create a new `Source=Quilt` Policy with access (usually "Read-write") to relevant S3 Buckets, and attach it to that Role
+1. Create a new Quilt Role (`Source=Quilt`), such as "AthenaQuiltAccess"
+1. Create a new Quilt Policy (`Source=Quilt`) with access to any
+buckets that your Athena tables will read from, and any other buckets
+in the Quilt stack that you wish your users to access.
 1. Assign that Role to the Quilt Users that need to access Athena
 
-See the [Users and Roles](https://docs.quiltdata.com/catalog/admin)
-documentation for more details about using Admin Settings to create and assign Roles and Policies.
+See [Users and Roles](https://docs.quiltdata.com/catalog/admin)
+documentation for more details on managing Roles and Policies.
 
-## II. Upload Athena Configuration files to S3
+## II. Upload CloudFormation templates to S3
 
-There are two Athena templates in this directory,
-which must be uploaded directly to S3
-(as they are too large to read directly into CloudFormation)
+There are two templates in this directory. Both should be uploaded directly to S3
+since they are larger than the AWS console allows for direct upload.
 
-*  `athena-cfn.yml` is only run once, and creates a results bucket and
-workgroup usable by the entire account (with appropriate permissions).
+* run `athena-cfn.yml` once to create a new workgroup and results bucket, along
+with the appropriate permissions
 
-* `athena-bucket-cfn.yml` must be run *once for each Quilt bucket*
-that Athena should query. This creates bucket-specific tables and views which
-wrap the underlying Quilt metadata.
+* run`athena-bucket-cfn.yml` *once for each Quilt bucket* that you wish to SQL query.
+The second template creates bucket-specific tables and views for querying object
+and package metadata for any packages in that bucket.
 
-To install these in S3:
+### Upload templates to S3
 
-1. Go to Amazon S3 -> Buckets  in the AWS Console for the region where most
-of your buckets are, e.g.:
-https://s3.console.aws.amazon.com/s3/buckets?region=us-east-1
+1. Go to AWS Console > S3 in the appropriate region.
 1. Choose any bucket you can read and write to
 1. Create or navigate to an appropriate folder
-1. Select Upload -> Add files
+1. Select Upload > Add files
 1. Select both `athena-cfn.yml` and `athena-bucket-cfn.yml` from this repository
 1. Click Upload
 1. Command-click on each filename to open it in a new browser window
@@ -61,10 +60,8 @@ https://s3.console.aws.amazon.com/s3/buckets?region=us-east-1
 Note: If you store large amounts of data in multiple regions, you may need to
 create and manage one such stack per _region_ (rather than per _account_).
 
-1. Go to CloudFormation -> Stacks in the AWS Console for the region where most
-of your buckets are, e.g.:
-https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks
-1. Click dropdown "Create stack" -> "With new resources (standard)"
+1. Go to AWS Console > CloudFormation > Stacks.
+1. Click dropdown "Create stack" > "With new resources (standard)"
 1. Select "Template is ready" (default)
 1. Select "Amazon S3 URL" (default)
 1. Paste in the `athena-cfn.yml` Object URL from above
@@ -85,11 +82,11 @@ so you can use its Outputs for the following steps.
 
 ### B. Extend Quilt's Permission Boundary
 
-1. Go to the "Outputs" tab of the installed template
+1. Click the Outputs tab of the stack
 1. Copy the `AthenaPolicy` ARN from the "Value" column
 1. Go to your original Quilt CloudFormation stack
-1. Click "Update" -> "Use current template"
-1. Scroll down to "Other parameters" -> "ManagedUserRoleExtraPolicies"
+1. Click "Update" > "Use current template"
+1. Scroll down to "Other parameters" > "ManagedUserRoleExtraPolicies"
 1. Paste in that ARN (adding a comma if necessary)
 1. Click "Next" and then "Next"
 1. Check "I acknowledge that AWS CloudFormation might create IAM resources with custom names."
@@ -136,7 +133,7 @@ Note that this process assumes you have already:
 
 Go to CloudFormation in the same Account and Region as before:
 
-1. Click dropdown "Create stack" -> "With new resources (standard)"
+1. Click dropdown "Create stack" > "With new resources (standard)"
 1. Select "Template is ready" (default)
 1. Select "Amazon S3 URL" (default)
 1. Paste in the `athena-bucket-cfn.yml` Object URL from before
