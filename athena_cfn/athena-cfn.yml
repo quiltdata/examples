@@ -66,33 +66,16 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-        - Sid: AccessAllAthenaWorkgroups
-          Effect: Allow
-          Action: athena:ListWorkGroups
-          Resource: '*'
-        - Sid: AccessQuiltAthenaWorkgroup
+        - Sid: ViewAllDatabaseInfo
           Effect: Allow
           Action:
-          - athena:Create*
-          - athena:*Get*
           - athena:List*
-          - athena:StartQueryExecution
-          Resource:
-          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
-          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:datacatalog/*'
-          - !Sub
-            - 'arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${Workgroup}'
-            - {Workgroup: !Ref QuiltAthenaWorkgroup}
-
-        - Sid: AccessGlueDatabases
-          Effect: Allow
-          Action:
           - glue:GetDatabase
           - glue:GetDatabases
           - glue:GetTable
           - glue:GetTables
           Resource: '*'
-        - Sid: ModifyGlueDatabases
+        - Sid: ModifyGlueTables
           Effect: Allow
           Action:
           - glue:CreateTable
@@ -106,9 +89,13 @@ Resources:
           - !Sub
             - 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${Database}/${Tables}'
             - {Database: !Ref DatabaseName, Tables: !Ref DatabaseTablePattern}
-        - Sid: AccessQuiltAthenaOutputBucket
+        - Sid: AccessAthenaResources
           Effect: Allow
           Action:
+          - athena:Create*
+          - athena:*Get*
+          - athena:List*
+          - athena:StartQueryExecution
           - s3:GetBucketLocation
           - s3:GetObject
           - s3:ListBucket
@@ -120,6 +107,11 @@ Resources:
           Resource:
           - !GetAtt QuiltAthenaOutput.Arn
           - !Sub "${QuiltAthenaOutput.Arn}/*"
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:datacatalog/*'
+          - !Sub
+            - 'arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${Workgroup}'
+            - {Workgroup: !Ref QuiltAthenaWorkgroup}
 
 Outputs:
   AthenaPolicy:
