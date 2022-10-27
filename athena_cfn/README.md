@@ -32,8 +32,7 @@ documentation for more details on managing Roles and Policies.
 
 ## II. Upload CloudFormation templates to S3
 
-There are two templates in this directory. Both should be uploaded directly to S3
-since they are larger than the AWS console allows for direct upload.
+There are two templates in this directory.
 
 * run `athena-cfn.yml` once to create a new workgroup and results bucket, along
 with the appropriate permissions
@@ -41,17 +40,6 @@ with the appropriate permissions
 * run`athena-bucket-cfn.yml` *once for each Quilt bucket* that you wish to SQL query.
 The second template creates bucket-specific tables and views for querying object
 and package metadata for any packages in that bucket.
-
-### Upload templates to S3
-
-1. Go to AWS Console > S3 in the appropriate region.
-1. Choose any bucket you can read and write to
-1. Create or navigate to an appropriate folder
-1. Select Upload > Add files
-1. Select both `athena-cfn.yml` and `athena-bucket-cfn.yml` from this repository
-1. Click Upload
-1. Command-click on each filename to open it in a new browser window
-1. Remember or copy and paste the `https` 'Object URL' for each file
 
 ## III. Create Athena Workgroup
 
@@ -63,8 +51,8 @@ create and manage one such stack per _region_ (rather than per _account_).
 1. Go to AWS Console > CloudFormation > Stacks.
 1. Click dropdown "Create stack" > "With new resources (standard)"
 1. Select "Template is ready" (default)
-1. Select "Amazon S3 URL" (default)
-1. Paste in the `athena-cfn.yml` Object URL from above
+1. Select "Upload a template file"
+1. Click "Choose File" and select `athena-cfn.yml`
 1. Click Next
 1. Enter "Stack name", e.g.: `athena-quilt`
 1. Click Next
@@ -135,8 +123,8 @@ Go to CloudFormation in the same Account and Region as before:
 
 1. Click dropdown "Create stack" > "With new resources (standard)"
 1. Select "Template is ready" (default)
-1. Select "Amazon S3 URL" (default)
-1. Paste in the `athena-bucket-cfn.yml` Object URL from before
+1. Select "Upload a template file"
+1. Click "Choose File" and select `athena-bucket-cfn.yml`
 1. Click Next
 1. Enter a new "Stack name", e.g.: `your-bucket-athena-quilt`
 1. Enter "QuiltAthenaStack", e.g.: `athena-quilt` (from part III.A.7)
