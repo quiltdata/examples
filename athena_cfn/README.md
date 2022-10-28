@@ -62,7 +62,7 @@ so you can use its Outputs for the following steps.
 ### B. Extend Quilt's Permission Boundary
 
 1. Click the Outputs tab of the stack
-1. Copy the `AthenaPolicy` ARN from the "Value" column
+1. Copy the "AthenaPolicy" ARN from the "Value" column
 1. Go to your original Quilt CloudFormation stack
 1. Click "Update" > "Use current template"
 1. Scroll down to "Other parameters" > "ManagedUserRoleExtraPolicies"
