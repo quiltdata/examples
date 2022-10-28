@@ -142,7 +142,8 @@ Save this link in a shared space so you and other AWS users can easily index add
 
 ### C. Manually invoke view-creating queries
 
-Unfortunately, CloudFormation does not automatically generate the proper views.
+Unfortunately, there is no easy way for CloudFormation
+to automatically generate the proper views.
 To complete setup, you will need to manually execute two pre-defined queries for each bucket:
 
 1. Login to your Quilt Repository

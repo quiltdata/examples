@@ -8,7 +8,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Configure Athena tables for a Quilt Bucket
 Parameters:
   QuiltAthenaStack:
-    Description: Parent stack defining Athena Database, Workgroup and Bucket
+    Description: The parent stack that defined the Athena Database, Workgroup and Bucket
     Type: String
     MinLength: 1
     MaxLength: 128
@@ -20,7 +20,9 @@ Parameters:
     MaxLength: 63
     AllowedPattern: '[a-z][-a-z0-9]*'
   QuiltBucketID:
-    Description: SQL-compatible version of QuiltBucket name, to use as a prefix
+    Description: |
+      SQL-compatible string similar to the of QuiltBucket name,
+      to use as a prefix for generated resources
     Type: String
     MinLength: 3
     MaxLength: 63
