@@ -6,10 +6,11 @@ in SQL with [Quilt's Athena Integration](https://docs.quiltdata.com/advanced/ath
 
 ## I. Prologue: Ensure Source=Quilt Roles for Athena users
 
-Quilt stacks ship with two `Source=Custom` roles that
-automatically grant access to all buckets that have been added to Quilt.
-At this time `Source=Custom` Roles are incompatible with custom policies
-(including Athena policies). If you have not already,
+Quilt stacks ship with two `Source=Custom` roles
+(based on manually-set ARNs managed by AWS)
+that automatically grant access to all buckets that have been added to Quilt.
+At this time those `Source=Custom` Roles are incompatible with policies created
+from the Quilt Admin panel (including Athena policies). If you have not already,
 before proceeding you must do the following in the Quilt Admin panel:
 
 1. Create a new Quilt Role (`Source=Quilt`), such as "AthenaQuiltAccess"
@@ -28,7 +29,7 @@ There are two templates in this directory.
 * run `athena-cfn.yml` once to create a new workgroup and results bucket, along
 with the appropriate permissions
 
-* run`athena-bucket-cfn.yml` *once for each Quilt bucket* that you wish to SQL query.
+* run `athena-bucket-cfn.yml` *once for each Quilt bucket* that you wish to SQL query.
 The second template creates bucket-specific tables and views for querying object
 and package metadata for any packages in that bucket.
 
