@@ -1,12 +1,13 @@
 # Query Quilt Package Metadata in AWS Athena
 
-The code in this example shows you how to enable use of the "Queries"
-tab of the Quilt Catalog for querying Quilt [metadata](https://docs.quiltdata.com/catalog/metadata) for a given bucket using [Athena SQL](https://docs.quiltdata.com/advanced/athena).
+The code in this example shows you how to enable the "Queries"
+tab of the Quilt Catalog for querying Quilt [metadata](https://docs.quiltdata.com/catalog/metadata)
+in SQL with [Quilt's Athena Integration](https://docs.quiltdata.com/advanced/athena).
 
 ### Validating CloudFormation files
 
-If for any reason you need to edit the CloudFormation files,
-be sure to lint them before using:
+If you need to edit the CloudFormation YAML files in this example,
+we recommend that you lint them as follows:
 
 ```
 $ pip3 install --upgrade taskcat cfn-lint
@@ -15,7 +16,7 @@ $ taskcat lint && cfn-lint *cfn.yml
 
 ## I. Prologue: Ensure Source=Quilt Roles for Athena users
 
-The initial Quilt deployment ships with two `Source=Custom` Roles that
+Quilt stacks ship with two `Source=Custom` roles that
 automatically grant access to all buckets that have been added to Quilt.
 At this time `Source=Custom` Roles are incompatible with custom policies
 (including Athena policies). If you have not already,
