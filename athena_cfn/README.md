@@ -4,16 +4,6 @@ The code in this example shows you how to enable the "Queries"
 tab of the Quilt Catalog for querying Quilt [metadata](https://docs.quiltdata.com/catalog/metadata)
 in SQL with [Quilt's Athena Integration](https://docs.quiltdata.com/advanced/athena).
 
-### Validating CloudFormation files
-
-If you need to edit the CloudFormation YAML files in this example,
-we recommend that you lint them as follows:
-
-```
-$ pip3 install --upgrade taskcat cfn-lint
-$ taskcat lint && cfn-lint *cfn.yml
-```
-
 ## I. Prologue: Ensure Source=Quilt Roles for Athena users
 
 Quilt stacks ship with two `Source=Custom` roles that
@@ -177,3 +167,13 @@ From that same Queries tab and workgroup:
 
 The results will be saved on your local machine.
 
+## NOTE: Validating CloudFormation files
+
+If you need to edit the CloudFormation YAML files in this example,
+we recommend that you lint them as follows.  
+Be sure to switch to the appropriate environment before installing new modules.
+
+```
+$ pip3 install --upgrade taskcat cfn-lint
+$ taskcat lint && cfn-lint *cfn.yml
+```
