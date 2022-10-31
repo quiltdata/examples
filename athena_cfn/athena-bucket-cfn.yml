@@ -1,0 +1,235 @@
+# Purpose:  Expose Metadata from a single Quilt bucket in Athena
+#===============================================================================
+# https://aws.amazon.com/cloudformation/resources/templates/
+# https://catalog.us-east-1.prod.workshops.aws/workshops/9981f1a1-abdc-49b5-8387-cb01d238bb78/en-US/20-howtostart/201-self-paced/2013-cloudformation
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/walkthrough-crossstackref.html
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Configure Athena tables for a Quilt Bucket
+Parameters:
+  QuiltAthenaStack:
+    Description: The parent stack that defined the Athena Database, Workgroup and Bucket
+    Type: String
+    MinLength: 1
+    MaxLength: 128
+    AllowedPattern: '[a-zA-Z][-a-zA-Z0-9]*'
+  QuiltBucket:
+    Description: Name of an S3 Bucket containing Quilt packages
+    Type: String
+    MinLength: 3
+    MaxLength: 63
+    AllowedPattern: '[a-z][-a-z0-9]*'
+  QuiltBucketID:
+    Description: |
+      SQL-compatible string similar to the of QuiltBucket name,
+      to use as a prefix for generated resources
+    Type: String
+    MinLength: 3
+    MaxLength: 63
+    AllowedPattern: '[a-z][_a-z0-9]*'
+
+#
+# Input Parsing
+#
+
+# Glue TABLE
+## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-glue-table-storagedescriptor.html
+## https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html#aws-glue-api-catalog-tables-SerDeInfo
+
+# StorageDescriptor
+## https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html#aws-glue-api-catalog-tables-StorageDescriptor
+
+# SerdeInfo
+## https://docs.aws.amazon.com/athena/latest/ug/supported-serdes.html
+## https://github.com/apache/hive/blob/master/serde/src/java/org/apache/hadoop/hive/serde2/lazy/LazySimpleSerDe.java
+
+Resources:
+
+  ManifestsTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName:
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
+      TableInput:
+        Name: !Sub "${QuiltBucketID}_quilt_manifests"
+        Description: !Sub "Table of all the manifests in s3://${QuiltBucket} (all package-level and object-level metadata)"
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          has_encrypted_data: false
+        StorageDescriptor:
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
+          SerdeInfo:
+            Parameters:
+              ignore.malformed.json: true
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+          Location: !Sub "s3://${QuiltBucket}/.quilt/packages"
+          Columns:
+          - Name: logical_key
+            Type: string
+          - Name: physical_keys
+            Type: array<string>
+          - Name: size
+            Type: bigint
+          - Name: hash
+            Type: struct<type:string,value:string>
+          - Name: meta
+            Type: string
+          - Name: user_meta
+            Type: string
+          - Name: message
+            Type: string
+          - Name: version
+            Type: string
+
+  PackagesTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName:
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
+      TableInput:
+        Name: !Sub "${QuiltBucketID}_quilt_packages"
+        Description: !Sub "Make package of top hashes from s3://${QuiltBucket} available in Athena"
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          has_encrypted_data: false
+        StorageDescriptor:
+          Location: !Sub "s3://${QuiltBucket}/.quilt/named_packages"
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
+          SerdeInfo:
+            Parameters:
+              field.delim: ','
+            SerializationLibrary: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+          Columns:
+          - Name: hash
+            Type: string
+
+  PackagesViewCreator:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      WorkGroup:
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-workgroup"
+      Database:
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
+      Name: !Sub "create1_${PackagesTable}_view"
+      Description: !Sub "Quilt Query to create View from ${PackagesTable}"
+      QueryString:
+        Fn::Sub:
+          - |
+            CREATE VIEW ${View} AS WITH
+            npv AS (
+              SELECT
+                regexp_extract("$path", '^s3:\/\/([^\/]+)\/([^\/]+)\/([^\/]+)\/([^\/]+)', 4) as user,
+                regexp_extract("$path", '^s3:\/\/([^\/]+)\/([^\/]+)\/([^\/]+)\/([^\/]+)\/([^\/]+)', 5) as name,
+                regexp_extract("$path", '[^/]+$') as timestamp,
+                ${Packages}."hash"
+                FROM ${Packages}
+            ),
+            mv AS (
+              SELECT
+                regexp_extract("$path", '[^/]+$') as tophash,
+                  manifest."meta",
+                  manifest."message"
+                FROM ${Manifests} as manifest
+                WHERE manifest."logical_key" IS NULL
+            )
+            SELECT
+              npv."user",
+              npv."name",
+              npv."hash",
+              npv."timestamp",
+              mv."message",
+              mv."meta"
+            FROM npv
+            JOIN mv
+            ON npv."hash" = mv."tophash";
+
+          - Manifests: !Ref ManifestsTable
+            Packages: !Ref PackagesTable
+            View: !Sub "${PackagesTable}_view"
+
+  ObjectsViewCreator:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      WorkGroup:
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-workgroup"
+      Database:
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
+      Name: !Sub "create2_${QuiltBucketID}_quilt_objects_view"
+      Description: !Sub "Quilt Query to create View from ${ManifestsTable}"
+      QueryString:
+        Fn::Sub:
+          - |
+            CREATE VIEW ${View} AS WITH
+              mv AS (
+                SELECT
+                  regexp_extract("$path", '[^/]+$') as tophash,
+                  manifest."logical_key",
+                  manifest."physical_keys",
+                  manifest."size",
+                  manifest."hash",
+                  manifest."meta",
+                  manifest."user_meta"
+                FROM
+                  ${Manifests} as manifest
+                WHERE manifest."logical_key" IS NOT NULL
+              )
+            SELECT
+              npv."user",
+              npv."name",
+              npv."timestamp",
+              mv."tophash",
+              mv."logical_key",
+              mv."physical_keys",
+              mv."size",
+              mv."hash",
+              mv."meta",
+              mv."user_meta"
+            FROM mv
+            JOIN ${PkgView} as npv
+            ON npv."hash" = mv."tophash";
+
+          - Manifests: !Ref ManifestsTable
+            PkgView: !Sub "${PackagesTable}_view"
+            View: !Sub "${QuiltBucketID}_quilt_objects_view"
+
+  ObjectsViewTest:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      WorkGroup:
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-workgroup"
+      Database:
+        Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
+      Name: !Sub "preview_${QuiltBucketID}_quilt_objects_view"
+      Description: !Sub "Preview data from ${ManifestsTable}"
+      QueryString: !Sub "SELECT * FROM ${QuiltBucketID}_quilt_objects_view LIMIT 20"
+
+Outputs:
+  ManifestsTable:
+    Value: !Ref ManifestsTable
+    Export:
+      Name: !Sub "${AWS::StackName}-manifests-table"
+  PackagesTable:
+    Value: !Ref PackagesTable
+    Export:
+      Name: !Sub "${AWS::StackName}-packages-table"
+  ObjectsView:
+    Value: !Sub "${QuiltBucketID}_quilt_objects_view"
+    Export:
+      Name: !Sub "${AWS::StackName}-objects-view"
+  PackagesView:
+    Value: !Sub "${PackagesTable}_view"
+    Export:
+      Name: !Sub "${AWS::StackName}-packages-view"
+  PackagesViewCreator:
+    Value: !Ref PackagesViewCreator
+    Export:
+      Name: !Sub "${AWS::StackName}-packages-view-creator"
+  ObjectsViewCreator:
+    Value: !Ref ObjectsViewCreator
+    Export:
+      Name: !Sub "${AWS::StackName}-objects-view-creator"
+
