@@ -131,7 +131,7 @@ Resources:
             mv AS (
               SELECT
                 regexp_extract("$path", '[^/]+$') as tophash,
-                  manifest."meta",
+                  manifest."user_meta",
                   manifest."message"
                 FROM ${Manifests} as manifest
                 WHERE manifest."logical_key" IS NULL
@@ -142,7 +142,7 @@ Resources:
               npv."hash",
               npv."timestamp",
               mv."message",
-              mv."meta"
+              mv."user_meta"
             FROM npv
             JOIN mv
             ON npv."hash" = mv."tophash";
