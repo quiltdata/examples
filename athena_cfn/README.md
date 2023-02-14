@@ -37,7 +37,8 @@ and package metadata for any packages in that bucket.
 
 ### A. Install `athena-cfn.yml` CloudFormation template
 
-Note: If you store large amounts of data in multiple regions, you may need to
+Note: You must import this template into the same account/region as your Quilt stack.
+If you store large amounts of data in multiple regions, you may need to
 create and manage one such stack per _region_ (rather than per _account_).
 
 1. Go to AWS Console > CloudFormation > Stacks.
