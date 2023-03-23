@@ -4,8 +4,7 @@ import altair as alt
 alt.data_transformers.disable_max_rows()
 
 # Colorscheme from https://vega.github.io/vega/docs/schemes/
-COLORSCHEME = "bluegreen"
-# COLORSCHEME = "viridis"
+COLORSCHEME = "viridis"
 
 # Import the data
 df = pd.read_csv ('data/vanden_counts.csv')
