@@ -14,7 +14,7 @@ Parameters:
     Type: String
     MinLength: 1
     MaxLength: 255
-    AllowedPattern: '[a-z][_a-z]*'
+    AllowedPattern: '*'
   DatabaseTablePattern:
     Default: '*_quilt_*'
     Description: Pattern to identify Quilt-created Tables
