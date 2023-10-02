@@ -91,20 +91,16 @@ Resources:
         Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
       TableInput:
         Name: !Sub "${QuiltBucketID}_quilt_packages"
-        Description: !Sub "Make package of top hashes from s3://${QuiltBucket} available in Athena"
+        Description: !Sub "Table of top hashes in s3://${QuiltBucket}"
         TableType: EXTERNAL_TABLE
-        Parameters:
-          has_encrypted_data: false
         StorageDescriptor:
           Location: !Sub "s3://${QuiltBucket}/.quilt/named_packages"
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
           SerdeInfo:
-            Parameters:
-              field.delim: ','
             SerializationLibrary: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           Columns:
-          - Name: hash
+          - Name: top_hash
             Type: string
 
   PackagesViewCreator:
@@ -116,40 +112,35 @@ Resources:
         Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
       Name: !Sub "create1_${PackagesTable}_view"
       Description: !Sub "Quilt Query to create View from ${PackagesTable}"
-      QueryString:
-        Fn::Sub:
-          - |
-            CREATE VIEW ${View} AS WITH
-            npv AS (
-              SELECT
-                regexp_extract("$path", '^s3:\/\/([^\/]+)\/([^\/]+)\/([^\/]+)\/([^\/]+)', 4) as user,
-                regexp_extract("$path", '^s3:\/\/([^\/]+)\/([^\/]+)\/([^\/]+)\/([^\/]+)\/([^\/]+)', 5) as name,
-                regexp_extract("$path", '[^/]+$') as timestamp,
-                ${Packages}."hash"
-                FROM ${Packages}
-            ),
-            mv AS (
-              SELECT
-                regexp_extract("$path", '[^/]+$') as tophash,
-                  manifest."user_meta",
-                  manifest."message"
-                FROM ${Manifests} as manifest
-                WHERE manifest."logical_key" IS NULL
-            )
-            SELECT
-              npv."user",
-              npv."name",
-              npv."hash",
-              npv."timestamp",
-              mv."message",
-              mv."user_meta"
-            FROM npv
-            JOIN mv
-            ON npv."hash" = mv."tophash";
-
-          - Manifests: !Ref ManifestsTable
-            Packages: !Ref PackagesTable
-            View: !Sub "${PackagesTable}_view"
+      QueryString: !Sub |
+        CREATE OR REPLACE VIEW "${QuiltBucketID}_quilt_packages_view" AS
+        WITH
+          npv AS (
+          SELECT
+            regexp_extract("$path", '^s3://[^/]+/[^/]+/[^/]+/([^/]+/[^/]+)', 1) pkg_name
+          , regexp_extract("$path", '[^/]+$') timestamp
+          , top_hash
+          FROM
+            "${PackagesTable}"
+        )
+        , mv AS (
+          SELECT
+            regexp_extract("$path", '[^/]+$') top_hash
+          , manifest."user_meta"
+          , manifest."message"
+          FROM
+            "${ManifestsTable}" manifest
+          WHERE (manifest."logical_key" IS NULL)
+        )
+        SELECT
+          npv."pkg_name"
+        , npv."top_hash"
+        , npv."timestamp"
+        , mv."message"
+        , mv."user_meta"
+        FROM
+          (npv
+        INNER JOIN mv ON (npv."top_hash" = mv."top_hash"))
 
   ObjectsViewCreator:
     Type: AWS::Athena::NamedQuery
@@ -160,41 +151,42 @@ Resources:
         Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
       Name: !Sub "create2_${QuiltBucketID}_quilt_objects_view"
       Description: !Sub "Quilt Query to create View from ${ManifestsTable}"
-      QueryString:
-        Fn::Sub:
-          - |
-            CREATE VIEW ${View} AS WITH
-              mv AS (
-                SELECT
-                  regexp_extract("$path", '[^/]+$') as tophash,
-                  manifest."logical_key",
-                  manifest."physical_keys",
-                  manifest."size",
-                  manifest."hash",
-                  manifest."meta",
-                  manifest."user_meta"
-                FROM
-                  ${Manifests} as manifest
-                WHERE manifest."logical_key" IS NOT NULL
-              )
-            SELECT
-              npv."user",
-              npv."name",
-              npv."timestamp",
-              mv."tophash",
-              mv."logical_key",
-              mv."physical_keys",
-              mv."size",
-              mv."hash",
-              mv."meta",
-              mv."user_meta"
-            FROM mv
-            JOIN ${PkgView} as npv
-            ON npv."hash" = mv."tophash";
-
-          - Manifests: !Ref ManifestsTable
-            PkgView: !Sub "${PackagesTable}_view"
-            View: !Sub "${QuiltBucketID}_quilt_objects_view"
+      QueryString: !Sub |
+        CREATE OR REPLACE VIEW "${QuiltBucketID}_quilt_objects_view" AS
+        WITH
+          npv AS (
+          SELECT
+            regexp_extract("$path", '^s3://[^/]+/[^/]+/[^/]+/([^/]+/[^/]+)', 1) pkg_name
+          , regexp_extract("$path", '[^/]+$') timestamp
+          , top_hash
+          FROM
+            "${PackagesTable}"
+        )
+        , mv AS (
+          SELECT
+            regexp_extract("$path", '[^/]+$') top_hash
+          , manifest."logical_key"
+          , manifest."physical_keys"
+          , manifest."size"
+          , manifest."hash"
+          , manifest."meta"
+          , manifest."user_meta"
+          FROM
+            "${ManifestsTable}" manifest
+          WHERE (manifest."logical_key" IS NOT NULL)
+        )
+        SELECT
+          npv."pkg_name"
+        , npv."top_hash"
+        , npv."timestamp"
+        , mv."logical_key"
+        , mv."physical_keys"[1] physical_key
+        , mv."size"
+        , mv."hash"
+        , mv."meta"
+        FROM
+          (mv
+        INNER JOIN npv ON (npv."top_hash" = mv."top_hash"))
 
   ObjectsViewTest:
     Type: AWS::Athena::NamedQuery
@@ -205,7 +197,7 @@ Resources:
         Fn::ImportValue: !Sub "${QuiltAthenaStack}-database"
       Name: !Sub "preview_${QuiltBucketID}_quilt_objects_view"
       Description: !Sub "Preview data from ${ManifestsTable}"
-      QueryString: !Sub "SELECT * FROM ${QuiltBucketID}_quilt_objects_view LIMIT 20"
+      QueryString: !Sub 'SELECT * FROM "${QuiltBucketID}_quilt_objects_view" LIMIT 20'
 
 Outputs:
   ManifestsTable:
@@ -232,4 +224,3 @@ Outputs:
     Value: !Ref ObjectsViewCreator
     Export:
       Name: !Sub "${AWS::StackName}-objects-view-creator"
-
